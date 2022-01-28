@@ -12,8 +12,8 @@ import (
 )
 
 // window settings
-var windowWidth = 512
-var windowHeight = 512
+var windowWidth = 800
+var windowHeight = 600
 
 func init() {
 	// GLFW event handling must run on the main OS thread
@@ -161,29 +161,85 @@ in vec2 fragTexCoord;
 
 out vec4 outputColor;
 
-int get(vec2 coord) {
-    vec4 px = texture(state, vec2(gl_FragCoord.xy + coord) / scale, 0);
-    return px.r > 0.0 ? 1 : 0;
+vec4 get(vec2 coord) {
+    return texture(state, vec2(gl_FragCoord.xy + coord) / scale, 0);
+}
+
+ivec4 alive(vec4 cell) {
+	return ivec4(
+	  cell.r > 0.0 ? 1 : 0,
+	  cell.g > 0.0 ? 1 : 0,
+	  cell.b > 0.0 ? 1 : 0,
+	  cell.a > 0.0 ? 1 : 0
+	);
+}
+
+float op(float current, int sum) {
+    if (sum == 3) {
+    	return 1.0;
+    //} else if (sum == 1 || sum == 2 || sum == 3 || sum == 4 || sum == 5) {
+    } else if (sum == 2) {
+    	return current;
+    }
+
+    return 0.0;
 }
 
 void main() {
-    int sum = get(vec2(-1, -1)) +
-              get(vec2(-1,  0)) +
-              get(vec2(-1,  1)) +
-              get(vec2(0, -1)) +
-              get(vec2(0,  1)) +
-              get(vec2(1, -1)) +
-              get(vec2(1,  0)) +
-              get(vec2(1,  1));
-    if (sum == 3) {
-        outputColor = vec4(1.0, 1.0, 1.0, 1.0);
-    //} else if (sum == 1 || sum == 2 || sum == 3 || sum == 4 || sum == 5) {
-    } else if (sum == 2) {
-        float current = get(vec2(0, 0));
-        outputColor = vec4(current, current, current, 1.0);
-    } else {
-        outputColor = vec4(0.0, 0.0, 0.0, 1.0);
-    }
+    // sum each channel alive
+    ivec4 sum = alive(get(vec2(-1, -1))) +
+               alive(get(vec2(-1,  0))) +
+               alive(get(vec2(-1,  1))) +
+               alive(get(vec2( 0, -1))) +
+               alive(get(vec2( 0,  1))) +
+               alive(get(vec2( 1, -1))) +
+               alive(get(vec2( 1,  0))) +
+               alive(get(vec2( 1,  1)));
+
+    vec4 current = get(vec2(0, 0));
+    outputColor = vec4(
+    	op(current.r, sum.r),
+    	op(current.g, sum.g),
+    	op(current.b, sum.b),
+    	op(current.a, sum.a)
+    );
+}
+` + "\x00"
+
+var gainShader = `
+#version 410
+uniform sampler2D state;
+uniform sampler2D self;
+uniform vec2 scale;
+
+in vec2 fragTexCoord;
+out vec4 outputColor;
+
+const float gain = 0.3;
+const float decay = -0.01;
+
+vec4 getCell(vec2 coord) {
+    return texture(state, vec2(gl_FragCoord.xy + coord) / scale, 0);
+}
+
+vec4 getSelf(vec2 coord) {
+    return texture(self, vec2(gl_FragCoord.xy + coord) / scale, 0);
+}
+
+float update(float cell, float current) {
+	float offset = cell > 0.0 ? gain : decay;
+	return current + offset;
+}
+
+void main() {
+    vec4 cell = getCell(vec2(0, 0));
+    vec4 self = getSelf(vec2(0, 0));
+    outputColor = vec4(
+    	update(cell.r, self.r),
+    	update(cell.g, self.g),
+    	update(cell.b, self.b),
+    	update(cell.a, self.a)
+    );
 }
 ` + "\x00"
 
@@ -211,12 +267,19 @@ in vec2 fragTexCoord;
 out vec4 outputColor;
 
 void main() {
-    vec4 color = texture(state, fragTexCoord);
-    float pct = abs(sin(time));
-    if (color.r > 0.0) {
-    	color = vec4(viridis(pct), 1.0);
-    }
-    outputColor = color;
+    vec4 color = texture(state, fragTexCoord.xy);
+    // float pct = abs(sin(time));
+    // if (color.r > 0.0) {
+    // 	color = vec4(viridis(pct), 1.0);
+    // }
+    // outputColor = color;
+    // outputColor = vec4(
+    //   1.0 - color.r,
+    //   1.0 - color.g,
+    //   1.0 - color.b,
+    //   1.0
+    // );
+    outputColor = vec4(color.rgb, 1.0);
 }
 ` + "\x00"
 
