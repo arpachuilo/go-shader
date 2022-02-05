@@ -49,9 +49,6 @@ func NewContainer(width, height int, quadVertices *([]float32)) *Container {
 	return &c
 }
 
-var frames = 0
-var lastTime time.Time
-
 func (c *Container) Render(w *glfw.Window) {
 	didUpdate := c.Program.Render()
 

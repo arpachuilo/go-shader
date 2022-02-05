@@ -1,13 +1,9 @@
 package main
 
 import (
-	"fmt"
-	"image"
 	"log"
 	"runtime"
-	"strings"
 
-	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
 )
 
@@ -38,91 +34,12 @@ func main() {
 		panic(err)
 	}
 	window.MakeContextCurrent()
+	// TODO: Add program icon
+	// window.SetIcon()
 
 	renderer := NewRenderer(window)
 	renderer.Setup()
 	renderer.Start()
-}
-
-func newProgram(vertexShaderSource, fragmentShaderSource string) (uint32, error) {
-	vertexShader, err := compileShader(vertexShaderSource, gl.VERTEX_SHADER)
-	if err != nil {
-		return 0, err
-	}
-
-	fragmentShader, err := compileShader(fragmentShaderSource, gl.FRAGMENT_SHADER)
-	if err != nil {
-		return 0, err
-	}
-
-	program := gl.CreateProgram()
-
-	gl.AttachShader(program, vertexShader)
-	gl.AttachShader(program, fragmentShader)
-	gl.LinkProgram(program)
-
-	var status int32
-	gl.GetProgramiv(program, gl.LINK_STATUS, &status)
-	if status == gl.FALSE {
-		var logLength int32
-		gl.GetProgramiv(program, gl.INFO_LOG_LENGTH, &logLength)
-
-		log := strings.Repeat("\x00", int(logLength+1))
-		gl.GetProgramInfoLog(program, logLength, nil, gl.Str(log))
-
-		return 0, fmt.Errorf("failed to link program: %v", log)
-	}
-
-	gl.DeleteShader(vertexShader)
-	gl.DeleteShader(fragmentShader)
-
-	return program, nil
-}
-
-func compileShader(source string, shaderType uint32) (uint32, error) {
-	shader := gl.CreateShader(shaderType)
-
-	csources, free := gl.Strs(source)
-	gl.ShaderSource(shader, 1, csources, nil)
-	free()
-	gl.CompileShader(shader)
-
-	var status int32
-	gl.GetShaderiv(shader, gl.COMPILE_STATUS, &status)
-	if status == gl.FALSE {
-		var logLength int32
-		gl.GetShaderiv(shader, gl.INFO_LOG_LENGTH, &logLength)
-
-		log := strings.Repeat("\x00", int(logLength+1))
-		gl.GetShaderInfoLog(shader, logLength, nil, gl.Str(log))
-
-		return 0, fmt.Errorf("failed to compile %v: %v", source, log)
-	}
-
-	return shader, nil
-}
-
-func newTexture(rgba *image.RGBA) (uint32, error) {
-	var texture uint32
-	gl.GenTextures(1, &texture)
-	gl.ActiveTexture(gl.TEXTURE0)
-	gl.BindTexture(gl.TEXTURE_2D, texture)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
-	gl.TexImage2D(
-		gl.TEXTURE_2D,
-		0,
-		gl.RGBA,
-		int32(rgba.Rect.Size().X),
-		int32(rgba.Rect.Size().Y),
-		0,
-		gl.RGBA,
-		gl.UNSIGNED_BYTE,
-		gl.Ptr(rgba.Pix))
-
-	return texture, nil
 }
 
 var vertexShader = `
@@ -154,6 +71,8 @@ void main()
 
 var golShader = `
 #version 410
+uniform int s[9];
+uniform int b[9];
 uniform sampler2D state;
 uniform vec2 scale;
 
@@ -174,12 +93,11 @@ ivec4 alive(vec4 cell) {
 	);
 }
 
-float op(float current, int sum) {
-    if (sum == 3) {
+float op(float c, int n) {
+    if (n == b[0] || n == b[1] || n == b[2] || n == b[3] || n == b[4] || n == b[5] || n == b[6] || n == b[7] || n == b[8]) {
     	return 1.0;
-    //} else if (sum == 1 || sum == 2 || sum == 3 || sum == 4 || sum == 5) {
-    } else if (sum == 2) {
-    	return current;
+    } else if (n == s[0] || n == s[1] || n == s[2] || n == s[3] || n == s[4] || n == s[5] || n == s[6] || n == s[7] || n == s[8]) {
+      	return c;
     }
 
     return 0.0;

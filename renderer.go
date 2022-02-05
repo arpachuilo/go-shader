@@ -63,43 +63,14 @@ func (r *Renderer) Setup() {
 	gl.BufferData(gl.ARRAY_BUFFER, len(quadVertices)*4, gl.Ptr(quadVertices), gl.STATIC_DRAW)
 
 	// Configure global settings
-	gl.ClearColor(0.0, 0.0, 0.0, 1.0)
+	// gl.ClearColor(0.0, 0.0, 0.0, 1.0)
 }
+
+var frames = 0
+var lastTime time.Time
 
 func (r *Renderer) Start() {
 	tick := time.Tick(time.Duration(1000/r.RefreshRate) * time.Millisecond)
-
-	// TODO: REFACTOR
-	// Configure the vertex and fragment shaders
-	program, err := newProgram(vertexShader, golShader)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	// Configure the vertex and fragment shaders
-	copyProgram, err := newProgram(vertexShader, copyShader)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	gainProgram, err := newProgram(vertexShader, gainShader)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	// bindings
-	// shared with copyProgram
-	gl.BindFragDataLocation(program, 0, gl.Str("outputColor\x00"))
-
-	// shared with copyProgram
-	vertAttrib := uint32(gl.GetAttribLocation(program, gl.Str("vert\x00")))
-	gl.EnableVertexAttribArray(vertAttrib)
-	gl.VertexAttribPointerWithOffset(vertAttrib, 2, gl.FLOAT, false, 4*4, 0)
-
-	// shared with copyProgram
-	texCoordAttrib := uint32(gl.GetAttribLocation(program, gl.Str("vertTexCoord\x00")))
-	gl.EnableVertexAttribArray(texCoordAttrib)
-	gl.VertexAttribPointerWithOffset(texCoordAttrib, 2, gl.FLOAT, false, 4*4, 2*4)
 
 	// create textures
 	img1 := *image.NewRGBA(image.Rect(0, 0, windowWidth, windowHeight))
@@ -134,57 +105,49 @@ func (r *Renderer) Start() {
 		}
 	}
 
-	prevTexture, err := newTexture(&img1)
-	if err != nil {
-		panic(err)
-	}
+	prevTexture := LoadTexture(&img1)
+	nextTexture := LoadTexture(&img2)
+	gainTexture := LoadTexture(&img3)
 
-	// create back texture
-	nextTexture, err := newTexture(&img2)
-	if err != nil {
-		panic(err)
-	}
+	survive := []int32{-1, -1, 2, 3, -1, -1, -1, -1, -1}
+	birth := []int32{-1, -1, -1, 3, -1, -1, -1, -1, -1}
 
-	// create back texture
-	gainTexture, err := newTexture(&img3)
-	if err != nil {
-		panic(err)
-	}
+	lifeShader := MustCompileShader(vertexShader, golShader)
+	gainShader := MustCompileShader(vertexShader, gainShader)
+	copyShader := MustCompileShader(vertexShader, copyShader)
 
-	stateAttrib := gl.GetUniformLocation(program, gl.Str("state\x00"))
-	scaleAttrib := gl.GetUniformLocation(program, gl.Str("scale\x00"))
-
-	copyStateAttrib := gl.GetUniformLocation(copyProgram, gl.Str("state\x00"))
-	copyScaleAttrib := gl.GetUniformLocation(copyProgram, gl.Str("scale\x00"))
-	copyTimeAttrib := gl.GetUniformLocation(copyProgram, gl.Str("time\x00"))
-
-	gainStateAttrib := gl.GetUniformLocation(gainProgram, gl.Str("state\x00"))
-	gainSelfAttrib := gl.GetUniformLocation(gainProgram, gl.Str("self\x00"))
-	gainScaleAttrib := gl.GetUniformLocation(gainProgram, gl.Str("scale\x00"))
-
-	fmt.Println(gainProgram, gainTexture, gainScaleAttrib, gainStateAttrib, gainSelfAttrib)
 	var fbo uint32
 	gl.GenFramebuffers(1, &fbo)
 	gl.BindFramebuffer(gl.FRAMEBUFFER, fbo)
-	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, gainTexture, 0)
 
 	for !r.Window.ShouldClose() {
 		select {
 		// frame limiter
 		case <-tick:
 			t := glfw.GetTime()
+			frames++
+			currentTime := time.Now()
+			delta := currentTime.Sub(lastTime)
+			if delta > time.Second {
+				fps := frames / int(delta.Seconds())
+				r.Window.SetTitle(fmt.Sprintf("FPS: %v", fps))
+
+				lastTime = currentTime
+				frames = 0
+			}
 
 			// use gol program
 			gl.BindFramebuffer(gl.FRAMEBUFFER, fbo)
-			gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, nextTexture, 0)
+			gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, nextTexture.Texture, 0)
 
 			gl.BindVertexArray(r.vao)
-			gl.ActiveTexture(gl.TEXTURE0)
-			gl.BindTexture(gl.TEXTURE_2D, prevTexture)
+			prevTexture.Activate(gl.TEXTURE0)
 
-			gl.UseProgram(program)
-			gl.ProgramUniform1i(program, stateAttrib, 0)
-			gl.ProgramUniform2f(program, scaleAttrib, float32(r.Width), float32(r.Height))
+			lifeShader.Use().
+				Uniform1iv("s", survive).
+				Uniform1iv("b", birth).
+				Uniform1i("state", 0).
+				Uniform2f("scale", float32(r.Width), float32(r.Height))
 			gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
 
 			// swap texture
@@ -192,30 +155,27 @@ func (r *Renderer) Start() {
 
 			// use decay program
 			gl.BindFramebuffer(gl.FRAMEBUFFER, fbo)
-			gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, gainTexture, 0)
+			gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, gainTexture.Texture, 0)
 
 			gl.BindVertexArray(r.vao)
-			gl.ActiveTexture(gl.TEXTURE0)
-			gl.BindTexture(gl.TEXTURE_2D, prevTexture)
-			gl.ActiveTexture(gl.TEXTURE1)
-			gl.BindTexture(gl.TEXTURE_2D, gainTexture)
+			prevTexture.Activate(gl.TEXTURE0)
+			gainTexture.Activate(gl.TEXTURE1)
 
-			gl.UseProgram(gainProgram)
-			gl.ProgramUniform1i(gainProgram, gainStateAttrib, 0)
-			gl.ProgramUniform1i(gainProgram, gainSelfAttrib, 1)
-			gl.ProgramUniform2f(gainProgram, gainScaleAttrib, float32(r.Width), float32(r.Height))
+			gainShader.Use().
+				Uniform1i("state", 0).
+				Uniform1i("self", 1).
+				Uniform2f("scale", float32(r.Width), float32(r.Height))
 			gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
 
 			// use copy program
 			gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
 			gl.BindVertexArray(r.vao)
-			gl.ActiveTexture(gl.TEXTURE0)
-			gl.BindTexture(gl.TEXTURE_2D, gainTexture)
+			gainTexture.Activate(gl.TEXTURE0)
 
-			gl.UseProgram(copyProgram)
-			gl.ProgramUniform1i(copyProgram, copyStateAttrib, 0)
-			gl.ProgramUniform2f(copyProgram, copyScaleAttrib, float32(r.Width), float32(r.Height))
-			gl.ProgramUniform1f(copyProgram, copyTimeAttrib, float32(t))
+			copyShader.Use().
+				Uniform1i("state", 0).
+				Uniform1f("time", float32(t)).
+				Uniform2f("scale", float32(r.Width), float32(r.Height))
 			gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
 
 			// Maintenance
@@ -225,7 +185,6 @@ func (r *Renderer) Start() {
 	}
 
 	glfw.Terminate()
-
 }
 
 func (r *Renderer) ResizeCallback(w *glfw.Window, width int, height int) {
