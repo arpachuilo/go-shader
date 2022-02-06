@@ -24,7 +24,7 @@ type Renderer struct {
 	Width, Height int
 
 	KeyPressDetection *KeyPressDetection
-	LoopChannels      LoopChannels
+	Cmds              CmdChannels
 
 	Recorder *Recorder
 
@@ -39,7 +39,7 @@ func NewRenderer(window *glfw.Window) *Renderer {
 		Window:  window,
 
 		KeyPressDetection: NewKeyPressDetection(),
-		LoopChannels:      NewLoopChannels(),
+		Cmds:              NewCmdChannels(),
 
 		Recorder: NewRecorder(window),
 	}
@@ -59,7 +59,7 @@ func (r *Renderer) Setup() {
 	r.SetTickRate(r.RefreshRate)
 
 	// register key press channels
-	r.LoopChannels.Register(CaptureCmd)
+	r.Cmds.Register(CaptureCmd)
 
 	// print some info
 	version := gl.GoStr(gl.GetString(gl.VERSION))
@@ -95,7 +95,7 @@ func (r *Renderer) Start() {
 	for !r.Window.ShouldClose() {
 		select {
 		// capture frame
-		case <-r.LoopChannels[CaptureCmd]:
+		case <-r.Cmds[CaptureCmd]:
 			r.Capture()
 		// frame limiter
 		case <-r.Tick:
@@ -118,6 +118,7 @@ func (r *Renderer) Start() {
 			r.Window.SwapBuffers()
 			glfw.PollEvents()
 
+			// record
 			if r.Recorder.On {
 				r.Recorder.Capture()
 			}
@@ -139,7 +140,7 @@ func (r *Renderer) KeyCallback(w *glfw.Window, key glfw.Key, scancode int, actio
 	// call renderer key callbacks
 	if glfw.Release == action {
 		if key == glfw.KeyP {
-			r.LoopChannels.Issue(CaptureCmd)
+			r.Cmds.Issue(CaptureCmd)
 		}
 
 		if key == glfw.KeyQ {
@@ -194,13 +195,13 @@ func (r *Renderer) Capture() error {
 	return nil
 }
 
-type LoopChannels map[string](chan interface{})
+type CmdChannels map[string](chan interface{})
 
-func NewLoopChannels() LoopChannels {
+func NewCmdChannels() CmdChannels {
 	return make(map[string](chan interface{}))
 }
 
-func (lc LoopChannels) Issue(key string) error {
+func (lc CmdChannels) Issue(key string) error {
 	if _, ok := lc[key]; !ok {
 		return errors.New("cmd is not registered")
 	}
@@ -212,7 +213,7 @@ func (lc LoopChannels) Issue(key string) error {
 	return nil
 }
 
-func (lc LoopChannels) Register(key string) error {
+func (lc CmdChannels) Register(key string) error {
 	if _, ok := lc[key]; ok {
 		return errors.New("cmd already registered to channel")
 	}
@@ -221,6 +222,6 @@ func (lc LoopChannels) Register(key string) error {
 	return nil
 }
 
-func (lc LoopChannels) Unregister(key string) {
+func (lc CmdChannels) Unregister(key string) {
 	delete(lc, key)
 }

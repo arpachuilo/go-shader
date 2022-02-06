@@ -2,17 +2,16 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
 )
 
-type Shader struct {
-	Program uint32
-}
+type Shader uint32
 
 // MustCompileShader create a new shader program that must compile.
-func MustCompileShader(vertexShaderSource, fragmentShaderSource string) *Shader {
+func MustCompileShader(vertexShaderSource, fragmentShaderSource string) Shader {
 	shader, err := CompileShader(vertexShaderSource, fragmentShaderSource)
 	if err != nil {
 		panic(err)
@@ -22,15 +21,15 @@ func MustCompileShader(vertexShaderSource, fragmentShaderSource string) *Shader 
 }
 
 // CompileShader create a new shader program.
-func CompileShader(vertexShaderSource, fragmentShaderSource string) (*Shader, error) {
+func CompileShader(vertexShaderSource, fragmentShaderSource string) (Shader, error) {
 	vertexShader, err := compileShader(vertexShaderSource, gl.VERTEX_SHADER)
 	if err != nil {
-		return nil, err
+		return Shader(math.MaxUint32), err
 	}
 
 	fragmentShader, err := compileShader(fragmentShaderSource, gl.FRAGMENT_SHADER)
 	if err != nil {
-		return nil, err
+		return Shader(math.MaxUint32), err
 	}
 
 	program := gl.CreateProgram()
@@ -48,15 +47,11 @@ func CompileShader(vertexShaderSource, fragmentShaderSource string) (*Shader, er
 		log := strings.Repeat("\x00", int(logLength+1))
 		gl.GetProgramInfoLog(program, logLength, nil, gl.Str(log))
 
-		return nil, fmt.Errorf("failed to link program: %v", log)
+		return Shader(math.MaxUint32), fmt.Errorf("failed to link program: %v", log)
 	}
 
 	gl.DeleteShader(vertexShader)
 	gl.DeleteShader(fragmentShader)
-
-	shader := &Shader{
-		Program: program,
-	}
 
 	// bind output color location
 	gl.BindFragDataLocation(program, 0, gl.Str("outputColor\x00"))
@@ -71,7 +66,7 @@ func CompileShader(vertexShaderSource, fragmentShaderSource string) (*Shader, er
 	gl.EnableVertexAttribArray(taxCoords)
 	gl.VertexAttribPointerWithOffset(taxCoords, 2, gl.FLOAT, false, 4*4, 2*4)
 
-	return shader, nil
+	return Shader(program), nil
 }
 
 func compileShader(source string, shaderType uint32) (uint32, error) {
@@ -97,175 +92,175 @@ func compileShader(source string, shaderType uint32) (uint32, error) {
 	return shader, nil
 }
 
-func (s *Shader) Use() *Shader {
-	gl.UseProgram(s.Program)
+func (s Shader) Use() Shader {
+	gl.UseProgram(uint32(s))
 	return s
 }
 
-func (s *Shader) Uniform1d(name string, value float64) *Shader {
+func (s Shader) Uniform1d(name string, value float64) Shader {
 	attr := fmt.Sprintf("%v\x00", name)
-	location := gl.GetUniformLocation(s.Program, gl.Str(attr))
-	gl.ProgramUniform1d(s.Program, location, value)
+	location := gl.GetUniformLocation(uint32(s), gl.Str(attr))
+	gl.ProgramUniform1d(uint32(s), location, value)
 	return s
 }
 
-func (s *Shader) Uniform1dv(name string, values []float64) *Shader {
+func (s Shader) Uniform1dv(name string, values []float64) Shader {
 	attr := fmt.Sprintf("%v\x00", name)
-	location := gl.GetUniformLocation(s.Program, gl.Str(attr))
-	gl.ProgramUniform1dv(s.Program, location, int32(len(values)), &values[0])
+	location := gl.GetUniformLocation(uint32(s), gl.Str(attr))
+	gl.ProgramUniform1dv(uint32(s), location, int32(len(values)), &values[0])
 	return s
 }
 
-func (s *Shader) Uniform1f(name string, value float32) *Shader {
+func (s Shader) Uniform1f(name string, value float32) Shader {
 	attr := fmt.Sprintf("%v\x00", name)
-	location := gl.GetUniformLocation(s.Program, gl.Str(attr))
-	gl.ProgramUniform1f(s.Program, location, value)
+	location := gl.GetUniformLocation(uint32(s), gl.Str(attr))
+	gl.ProgramUniform1f(uint32(s), location, value)
 	return s
 }
 
-func (s *Shader) Uniform1fv(name string, values []float32) *Shader {
+func (s Shader) Uniform1fv(name string, values []float32) Shader {
 	attr := fmt.Sprintf("%v\x00", name)
-	location := gl.GetUniformLocation(s.Program, gl.Str(attr))
-	gl.ProgramUniform1fv(s.Program, location, int32(len(values)), &values[0])
+	location := gl.GetUniformLocation(uint32(s), gl.Str(attr))
+	gl.ProgramUniform1fv(uint32(s), location, int32(len(values)), &values[0])
 	return s
 }
 
-func (s *Shader) Uniform1i(name string, value int32) *Shader {
+func (s Shader) Uniform1i(name string, value int32) Shader {
 	attr := fmt.Sprintf("%v\x00", name)
-	location := gl.GetUniformLocation(s.Program, gl.Str(attr))
-	gl.ProgramUniform1i(s.Program, location, value)
+	location := gl.GetUniformLocation(uint32(s), gl.Str(attr))
+	gl.ProgramUniform1i(uint32(s), location, value)
 	return s
 }
 
-func (s *Shader) Uniform1iv(name string, values []int32) *Shader {
+func (s Shader) Uniform1iv(name string, values []int32) Shader {
 	attr := fmt.Sprintf("%v\x00", name)
-	location := gl.GetUniformLocation(s.Program, gl.Str(attr))
-	gl.ProgramUniform1iv(s.Program, location, int32(len(values)), &values[0])
+	location := gl.GetUniformLocation(uint32(s), gl.Str(attr))
+	gl.ProgramUniform1iv(uint32(s), location, int32(len(values)), &values[0])
 	return s
 }
 
-func (s *Shader) Uniform2d(name string, v0, v1 float64) *Shader {
+func (s Shader) Uniform2d(name string, v0, v1 float64) Shader {
 	attr := fmt.Sprintf("%v\x00", name)
-	location := gl.GetUniformLocation(s.Program, gl.Str(attr))
-	gl.ProgramUniform2d(s.Program, location, v0, v1)
+	location := gl.GetUniformLocation(uint32(s), gl.Str(attr))
+	gl.ProgramUniform2d(uint32(s), location, v0, v1)
 	return s
 }
 
-func (s *Shader) Uniform2dv(name string, values []float64) *Shader {
+func (s Shader) Uniform2dv(name string, values []float64) Shader {
 	attr := fmt.Sprintf("%v\x00", name)
-	location := gl.GetUniformLocation(s.Program, gl.Str(attr))
-	gl.ProgramUniform2dv(s.Program, location, int32(len(values)), &values[0])
+	location := gl.GetUniformLocation(uint32(s), gl.Str(attr))
+	gl.ProgramUniform2dv(uint32(s), location, int32(len(values)), &values[0])
 	return s
 }
 
-func (s *Shader) Uniform2f(name string, v0, v1 float32) *Shader {
+func (s Shader) Uniform2f(name string, v0, v1 float32) Shader {
 	attr := fmt.Sprintf("%v\x00", name)
-	location := gl.GetUniformLocation(s.Program, gl.Str(attr))
-	gl.ProgramUniform2f(s.Program, location, v0, v1)
+	location := gl.GetUniformLocation(uint32(s), gl.Str(attr))
+	gl.ProgramUniform2f(uint32(s), location, v0, v1)
 	return s
 }
 
-func (s *Shader) Uniform2fv(name string, values []float32) *Shader {
+func (s Shader) Uniform2fv(name string, values []float32) Shader {
 	attr := fmt.Sprintf("%v\x00", name)
-	location := gl.GetUniformLocation(s.Program, gl.Str(attr))
-	gl.ProgramUniform2fv(s.Program, location, int32(len(values)), &values[0])
+	location := gl.GetUniformLocation(uint32(s), gl.Str(attr))
+	gl.ProgramUniform2fv(uint32(s), location, int32(len(values)), &values[0])
 	return s
 }
 
-func (s *Shader) Uniform2i(name string, v0, v1 int32) *Shader {
+func (s Shader) Uniform2i(name string, v0, v1 int32) Shader {
 	attr := fmt.Sprintf("%v\x00", name)
-	location := gl.GetUniformLocation(s.Program, gl.Str(attr))
-	gl.ProgramUniform2i(s.Program, location, v0, v1)
+	location := gl.GetUniformLocation(uint32(s), gl.Str(attr))
+	gl.ProgramUniform2i(uint32(s), location, v0, v1)
 	return s
 }
 
-func (s *Shader) Uniform2iv(name string, values []int32) *Shader {
+func (s Shader) Uniform2iv(name string, values []int32) Shader {
 	attr := fmt.Sprintf("%v\x00", name)
-	location := gl.GetUniformLocation(s.Program, gl.Str(attr))
-	gl.ProgramUniform2iv(s.Program, location, int32(len(values)), &values[0])
+	location := gl.GetUniformLocation(uint32(s), gl.Str(attr))
+	gl.ProgramUniform2iv(uint32(s), location, int32(len(values)), &values[0])
 	return s
 }
 
-func (s *Shader) Uniform3d(name string, v0, v1, v2 float64) *Shader {
+func (s Shader) Uniform3d(name string, v0, v1, v2 float64) Shader {
 	attr := fmt.Sprintf("%v\x00", name)
-	location := gl.GetUniformLocation(s.Program, gl.Str(attr))
-	gl.ProgramUniform3d(s.Program, location, v0, v1, v2)
+	location := gl.GetUniformLocation(uint32(s), gl.Str(attr))
+	gl.ProgramUniform3d(uint32(s), location, v0, v1, v2)
 	return s
 }
 
-func (s *Shader) Uniform3dv(name string, values []float64) *Shader {
+func (s Shader) Uniform3dv(name string, values []float64) Shader {
 	attr := fmt.Sprintf("%v\x00", name)
-	location := gl.GetUniformLocation(s.Program, gl.Str(attr))
-	gl.ProgramUniform3dv(s.Program, location, int32(len(values)), &values[0])
+	location := gl.GetUniformLocation(uint32(s), gl.Str(attr))
+	gl.ProgramUniform3dv(uint32(s), location, int32(len(values)), &values[0])
 	return s
 }
 
-func (s *Shader) Uniform3f(name string, v0, v1, v2 float32) *Shader {
+func (s Shader) Uniform3f(name string, v0, v1, v2 float32) Shader {
 	attr := fmt.Sprintf("%v\x00", name)
-	location := gl.GetUniformLocation(s.Program, gl.Str(attr))
-	gl.ProgramUniform3f(s.Program, location, v0, v1, v2)
+	location := gl.GetUniformLocation(uint32(s), gl.Str(attr))
+	gl.ProgramUniform3f(uint32(s), location, v0, v1, v2)
 	return s
 }
 
-func (s *Shader) Uniform3fv(name string, values []float32) *Shader {
+func (s Shader) Uniform3fv(name string, values []float32) Shader {
 	attr := fmt.Sprintf("%v\x00", name)
-	location := gl.GetUniformLocation(s.Program, gl.Str(attr))
-	gl.ProgramUniform3fv(s.Program, location, int32(len(values)), &values[0])
+	location := gl.GetUniformLocation(uint32(s), gl.Str(attr))
+	gl.ProgramUniform3fv(uint32(s), location, int32(len(values)), &values[0])
 	return s
 }
 
-func (s *Shader) Uniform3i(name string, v0, v1, v2 int32) *Shader {
+func (s Shader) Uniform3i(name string, v0, v1, v2 int32) Shader {
 	attr := fmt.Sprintf("%v\x00", name)
-	location := gl.GetUniformLocation(s.Program, gl.Str(attr))
-	gl.ProgramUniform3i(s.Program, location, v0, v1, v2)
+	location := gl.GetUniformLocation(uint32(s), gl.Str(attr))
+	gl.ProgramUniform3i(uint32(s), location, v0, v1, v2)
 	return s
 }
 
-func (s *Shader) Uniform3iv(name string, values []int32) *Shader {
+func (s Shader) Uniform3iv(name string, values []int32) Shader {
 	attr := fmt.Sprintf("%v\x00", name)
-	location := gl.GetUniformLocation(s.Program, gl.Str(attr))
-	gl.ProgramUniform3iv(s.Program, location, int32(len(values)), &values[0])
+	location := gl.GetUniformLocation(uint32(s), gl.Str(attr))
+	gl.ProgramUniform3iv(uint32(s), location, int32(len(values)), &values[0])
 	return s
 }
 
-func (s *Shader) Uniform4d(name string, v0, v1, v2, v3 float64) *Shader {
+func (s Shader) Uniform4d(name string, v0, v1, v2, v3 float64) Shader {
 	attr := fmt.Sprintf("%v\x00", name)
-	location := gl.GetUniformLocation(s.Program, gl.Str(attr))
-	gl.ProgramUniform4d(s.Program, location, v0, v1, v2, v3)
+	location := gl.GetUniformLocation(uint32(s), gl.Str(attr))
+	gl.ProgramUniform4d(uint32(s), location, v0, v1, v2, v3)
 	return s
 }
 
-func (s *Shader) Uniform4dv(name string, values []float64) *Shader {
+func (s Shader) Uniform4dv(name string, values []float64) Shader {
 	attr := fmt.Sprintf("%v\x00", name)
-	location := gl.GetUniformLocation(s.Program, gl.Str(attr))
-	gl.ProgramUniform4dv(s.Program, location, int32(len(values)), &values[0])
+	location := gl.GetUniformLocation(uint32(s), gl.Str(attr))
+	gl.ProgramUniform4dv(uint32(s), location, int32(len(values)), &values[0])
 	return s
 }
 
-func (s *Shader) Uniform4f(name string, v0, v1, v2, v3 float32) *Shader {
+func (s Shader) Uniform4f(name string, v0, v1, v2, v3 float32) Shader {
 	attr := fmt.Sprintf("%v\x00", name)
-	location := gl.GetUniformLocation(s.Program, gl.Str(attr))
-	gl.ProgramUniform4f(s.Program, location, v0, v1, v2, v3)
+	location := gl.GetUniformLocation(uint32(s), gl.Str(attr))
+	gl.ProgramUniform4f(uint32(s), location, v0, v1, v2, v3)
 	return s
 }
 
-func (s *Shader) Uniform4fv(name string, values []float32) *Shader {
+func (s Shader) Uniform4fv(name string, values []float32) Shader {
 	attr := fmt.Sprintf("%v\x00", name)
-	location := gl.GetUniformLocation(s.Program, gl.Str(attr))
-	gl.ProgramUniform4fv(s.Program, location, int32(len(values)), &values[0])
+	location := gl.GetUniformLocation(uint32(s), gl.Str(attr))
+	gl.ProgramUniform4fv(uint32(s), location, int32(len(values)), &values[0])
 	return s
 }
 
-func (s *Shader) Uniform4i(name string, v0, v1, v2, v3 int32) *Shader {
+func (s Shader) Uniform4i(name string, v0, v1, v2, v3 int32) Shader {
 	attr := fmt.Sprintf("%v\x00", name)
-	location := gl.GetUniformLocation(s.Program, gl.Str(attr))
-	gl.ProgramUniform4i(s.Program, location, v0, v1, v2, v3)
+	location := gl.GetUniformLocation(uint32(s), gl.Str(attr))
+	gl.ProgramUniform4i(uint32(s), location, v0, v1, v2, v3)
 	return s
 }
 
-func (s *Shader) Uniform4iv(name string, values []int32) *Shader {
+func (s Shader) Uniform4iv(name string, values []int32) Shader {
 	attr := fmt.Sprintf("%v\x00", name)
-	location := gl.GetUniformLocation(s.Program, gl.Str(attr))
-	gl.ProgramUniform4iv(s.Program, location, int32(len(values)), &values[0])
+	location := gl.GetUniformLocation(uint32(s), gl.Str(attr))
+	gl.ProgramUniform4iv(uint32(s), location, int32(len(values)), &values[0])
 	return s
 }
