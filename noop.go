@@ -1,23 +1,27 @@
 package main
 
 import (
-	"image"
-
 	"github.com/go-gl/glfw/v3.3/glfw"
 )
 
-type NoopProgram struct{}
+type NoopProgram struct {
+}
 
 func NewNoopProgram() Program {
-	p := NoopProgram{}
-	return &p
+	return &NoopProgram{}
 }
 
-func (p *NoopProgram) Render() bool {
-	return false
+func (lp *NoopProgram) Load(window *glfw.Window, vao, vbo uint32) {
 }
 
-func (c *NoopProgram) ResizeCallback(img *image.RGBA, width int, height int) {}
+func (lp *NoopProgram) Render(t float64) {
 
-func (c *NoopProgram) KeyCallback(key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+}
+
+func (lp *NoopProgram) ResizeCallback(w *glfw.Window, width int, height int) {
+
+}
+
+func (lp *NoopProgram) KeyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+
 }

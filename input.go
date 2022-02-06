@@ -1,10 +1,11 @@
 package main
 
-import "github.com/go-gl/glfw/v3.3/glfw"
+import (
+	"github.com/go-gl/glfw/v3.3/glfw"
+)
 
 // KeyPressDetection Allows detection of multiple down-presses at the same time
 type KeyPressDetection struct {
-
 	// Map of currently pressed keys
 	Down map[glfw.Key]bool
 }

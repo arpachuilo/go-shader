@@ -1,24 +1,32 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"image"
-	"image/color"
-	"math/rand"
+	"image/png"
+	"os"
 	"time"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
 )
 
+var CaptureCmd = "capture"
+
 // Renderer handles running our programs
 type Renderer struct {
-	// Pipeable programs
-	Programs []Program
-	Window   *glfw.Window
+	Program Program
+	Window  *glfw.Window
 
+	Tick          <-chan time.Time
 	RefreshRate   float64
 	Width, Height int
+
+	KeyPressDetection *KeyPressDetection
+	LoopChannels      LoopChannels
+
+	Recorder *Recorder
 
 	vao uint32
 	vbo uint32
@@ -26,10 +34,14 @@ type Renderer struct {
 
 // NewRenderer Create new renderer
 func NewRenderer(window *glfw.Window) *Renderer {
-	programs := make([]Program, 0)
 	return &Renderer{
-		Programs: programs,
-		Window:   window,
+		Program: nil,
+		Window:  window,
+
+		KeyPressDetection: NewKeyPressDetection(),
+		LoopChannels:      NewLoopChannels(),
+
+		Recorder: NewRecorder(window),
 	}
 }
 
@@ -44,6 +56,10 @@ func (r *Renderer) Setup() {
 
 	// get refresh rate
 	r.RefreshRate = float64(glfw.GetPrimaryMonitor().GetVideoMode().RefreshRate)
+	r.SetTickRate(r.RefreshRate)
+
+	// register key press channels
+	r.LoopChannels.Register(CaptureCmd)
 
 	// print some info
 	version := gl.GoStr(gl.GetString(gl.VERSION))
@@ -66,64 +82,23 @@ func (r *Renderer) Setup() {
 	// gl.ClearColor(0.0, 0.0, 0.0, 1.0)
 }
 
+func (r *Renderer) SetTickRate(rr float64) {
+	r.Tick = time.Tick(time.Duration(1000/rr) * time.Millisecond)
+}
+
 var frames = 0
 var lastTime time.Time
 
 func (r *Renderer) Start() {
-	tick := time.Tick(time.Duration(1000/r.RefreshRate) * time.Millisecond)
-
-	// create textures
-	img1 := *image.NewRGBA(image.Rect(0, 0, windowWidth, windowHeight))
-	img2 := *image.NewRGBA(image.Rect(0, 0, windowWidth, windowHeight))
-	img3 := *image.NewRGBA(image.Rect(0, 0, windowWidth, windowHeight))
-	for x := 0; x < img1.Rect.Max.X; x++ {
-		for y := 0; y < img1.Rect.Max.Y; y++ {
-			var r uint8 = 0
-			if rand.Float32() > 0.7 {
-				r = 255
-			}
-
-			var g uint8 = 0
-			if rand.Float32() > 0.3 {
-				g = 255
-			}
-
-			var b uint8 = 0
-			if rand.Float32() > 0.5 {
-				b = 255
-			}
-
-			var a uint8 = 255
-			if rand.Float32() > 0.5 {
-				a = 255
-			}
-
-			c := color.RGBA{r, g, b, a}
-			img1.Set(x, y, c)
-			img2.Set(x, y, c)
-			img3.Set(x, y, color.White)
-		}
-	}
-
-	prevTexture := LoadTexture(&img1)
-	nextTexture := LoadTexture(&img2)
-	gainTexture := LoadTexture(&img3)
-
-	survive := []int32{-1, -1, 2, 3, -1, -1, -1, -1, -1}
-	birth := []int32{-1, -1, -1, 3, -1, -1, -1, -1, -1}
-
-	lifeShader := MustCompileShader(vertexShader, golShader)
-	gainShader := MustCompileShader(vertexShader, gainShader)
-	copyShader := MustCompileShader(vertexShader, copyShader)
-
-	var fbo uint32
-	gl.GenFramebuffers(1, &fbo)
-	gl.BindFramebuffer(gl.FRAMEBUFFER, fbo)
-
+	r.Program = NewLifeProgram()
+	r.Program.Load(r.Window, r.vao, r.vbo)
 	for !r.Window.ShouldClose() {
 		select {
+		// capture frame
+		case <-r.LoopChannels[CaptureCmd]:
+			r.Capture()
 		// frame limiter
-		case <-tick:
+		case <-r.Tick:
 			t := glfw.GetTime()
 			frames++
 			currentTime := time.Now()
@@ -136,51 +111,16 @@ func (r *Renderer) Start() {
 				frames = 0
 			}
 
-			// use gol program
-			gl.BindFramebuffer(gl.FRAMEBUFFER, fbo)
-			gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, nextTexture.Texture, 0)
+			// run
+			r.Program.Render(t)
 
-			gl.BindVertexArray(r.vao)
-			prevTexture.Activate(gl.TEXTURE0)
-
-			lifeShader.Use().
-				Uniform1iv("s", survive).
-				Uniform1iv("b", birth).
-				Uniform1i("state", 0).
-				Uniform2f("scale", float32(r.Width), float32(r.Height))
-			gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
-
-			// swap texture
-			prevTexture, nextTexture = nextTexture, prevTexture
-
-			// use decay program
-			gl.BindFramebuffer(gl.FRAMEBUFFER, fbo)
-			gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, gainTexture.Texture, 0)
-
-			gl.BindVertexArray(r.vao)
-			prevTexture.Activate(gl.TEXTURE0)
-			gainTexture.Activate(gl.TEXTURE1)
-
-			gainShader.Use().
-				Uniform1i("state", 0).
-				Uniform1i("self", 1).
-				Uniform2f("scale", float32(r.Width), float32(r.Height))
-			gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
-
-			// use copy program
-			gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
-			gl.BindVertexArray(r.vao)
-			gainTexture.Activate(gl.TEXTURE0)
-
-			copyShader.Use().
-				Uniform1i("state", 0).
-				Uniform1f("time", float32(t)).
-				Uniform2f("scale", float32(r.Width), float32(r.Height))
-			gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
-
-			// Maintenance
+			// maintenance
 			r.Window.SwapBuffers()
 			glfw.PollEvents()
+
+			if r.Recorder.On {
+				r.Recorder.Capture()
+			}
 		}
 	}
 
@@ -189,11 +129,98 @@ func (r *Renderer) Start() {
 
 func (r *Renderer) ResizeCallback(w *glfw.Window, width int, height int) {
 	r.Width, r.Height = width, height
+
+	r.Program.ResizeCallback(w, width, height)
 }
 
 func (r *Renderer) KeyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
-	// call key handlers for each program
-	for _, p := range r.Programs {
-		p.KeyCallback(key, scancode, action, mods)
+	r.Program.KeyCallback(w, key, scancode, action, mods)
+
+	// call renderer key callbacks
+	if glfw.Release == action {
+		if key == glfw.KeyP {
+			r.LoopChannels.Issue(CaptureCmd)
+		}
+
+		if key == glfw.KeyQ {
+			if !r.Recorder.On {
+				r.Recorder.Start()
+			} else {
+				r.Recorder.End()
+			}
+		}
 	}
+}
+
+func (r *Renderer) Capture() error {
+	// create sub-folders
+	subFolder := "cap"
+	folder := fmt.Sprintf("screencaptures/%v/", subFolder)
+	if _, err := os.Stat(folder); os.IsNotExist(err) {
+		os.MkdirAll(folder, 0700)
+	}
+
+	// create file
+	name := folder + time.Now().Format("20060102150405") + ".png"
+	f, err := os.Create(name)
+	if err != nil {
+		return err
+	}
+
+	// create image
+	w, h := r.Window.GetFramebufferSize()
+	img := *image.NewRGBA(image.Rect(0, 0, w, h))
+
+	// set active frame buffer as main one
+	gl.ReadPixels(
+		0, 0,
+		int32(w), int32(h),
+		gl.RGBA,
+		gl.UNSIGNED_BYTE,
+		gl.Ptr(img.Pix),
+	)
+
+	// encode png
+	fmt.Println("Saving", name)
+	if err = png.Encode(f, &img); err != nil {
+		return err
+	}
+
+	// cleanup
+	if err = f.Close(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type LoopChannels map[string](chan interface{})
+
+func NewLoopChannels() LoopChannels {
+	return make(map[string](chan interface{}))
+}
+
+func (lc LoopChannels) Issue(key string) error {
+	if _, ok := lc[key]; !ok {
+		return errors.New("cmd is not registered")
+	}
+
+	go func(chan interface{}) {
+		lc[key] <- nil
+	}(lc[key])
+
+	return nil
+}
+
+func (lc LoopChannels) Register(key string) error {
+	if _, ok := lc[key]; ok {
+		return errors.New("cmd already registered to channel")
+	}
+
+	lc[key] = make(chan interface{})
+	return nil
+}
+
+func (lc LoopChannels) Unregister(key string) {
+	delete(lc, key)
 }

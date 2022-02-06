@@ -6,11 +6,9 @@ import (
 	"github.com/go-gl/gl/v4.1-core/gl"
 )
 
-type Texture struct {
-	Texture uint32
-}
+type Texture uint32
 
-func LoadTexture(rgba *image.RGBA) *Texture {
+func LoadTexture(rgba *image.RGBA) Texture {
 	var texture uint32
 	gl.GenTextures(1, &texture)
 	gl.ActiveTexture(gl.TEXTURE0)
@@ -30,11 +28,11 @@ func LoadTexture(rgba *image.RGBA) *Texture {
 		gl.UNSIGNED_BYTE,
 		gl.Ptr(rgba.Pix))
 
-	return &Texture{texture}
+	return Texture(texture)
 }
 
-func (t *Texture) Activate(tex uint32) *Texture {
+func (t Texture) Activate(tex uint32) Texture {
 	gl.ActiveTexture(tex)
-	gl.BindTexture(gl.TEXTURE_2D, t.Texture)
+	gl.BindTexture(gl.TEXTURE_2D, uint32(t))
 	return t
 }
