@@ -10,7 +10,7 @@ import (
 	"github.com/rjeczalik/notify"
 )
 
-type LiveProgram struct {
+type LiveEditProgram struct {
 	Window *glfw.Window
 
 	// current texture
@@ -31,14 +31,14 @@ type LiveProgram struct {
 	vao, vbo uint32
 }
 
-func NewLiveProgram(filename string) Program {
-	return &LiveProgram{
+func NewLiveEditProgram(filename string) Program {
+	return &LiveEditProgram{
 		filename: filename,
 		history:  make([]string, 0),
 	}
 }
 
-func (p *LiveProgram) watch() {
+func (p *LiveEditProgram) watch() {
 	p.watcher = make(chan notify.EventInfo, 1)
 	p.pending = make(chan string, 1)
 	err := notify.Watch(p.filename, p.watcher, notify.Create, notify.Write)
@@ -78,7 +78,7 @@ func (p *LiveProgram) watch() {
 
 }
 
-func (p *LiveProgram) Load(window *glfw.Window, vao, vbo uint32) {
+func (p *LiveEditProgram) Load(window *glfw.Window, vao, vbo uint32) {
 	p.Window = window
 	p.vao = vao
 	p.vbo = vbo
@@ -93,7 +93,7 @@ func (p *LiveProgram) Load(window *glfw.Window, vao, vbo uint32) {
 	go p.watch()
 }
 
-func (p *LiveProgram) compile(code string) {
+func (p *LiveEditProgram) compile(code string) {
 	newShader, err := CompileShader(vertexShader, code)
 	if err != nil {
 		log.Println("error", err)
@@ -104,7 +104,7 @@ func (p *LiveProgram) compile(code string) {
 	p.history = append(p.history, code)
 }
 
-func (p *LiveProgram) run(t float64) {
+func (p *LiveEditProgram) run(t float64) {
 	width, height := p.Window.GetSize()
 	mx, my := p.Window.GetCursorPos()
 
@@ -120,7 +120,7 @@ func (p *LiveProgram) run(t float64) {
 	gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
 }
 
-func (p *LiveProgram) Render(t float64) {
+func (p *LiveEditProgram) Render(t float64) {
 	select {
 	case code := <-p.pending:
 		p.compile(code)
@@ -129,9 +129,9 @@ func (p *LiveProgram) Render(t float64) {
 	}
 }
 
-func (p *LiveProgram) KeyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+func (p *LiveEditProgram) KeyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 }
 
-func (p *LiveProgram) ResizeCallback(w *glfw.Window, width int, height int) {
+func (p *LiveEditProgram) ResizeCallback(w *glfw.Window, width int, height int) {
 	p.texture.Resize(width, height)
 }

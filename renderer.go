@@ -97,8 +97,8 @@ var frames = 0
 var lastTime time.Time
 
 func (r *Renderer) Start() {
-	// r.Program = NewLiveProgram("./shaders/live_edit.glsl")
-	r.Program = NewLifeProgram()
+	r.Program = NewLiveEditProgram("./shaders/live_edit.glsl")
+	// r.Program = NewLifeProgram()
 	r.Program.Load(r.Window, r.vao, r.vbo)
 	for !r.Window.ShouldClose() {
 		select {
