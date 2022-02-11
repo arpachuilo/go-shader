@@ -1,12 +1,57 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"strings"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
 )
+
+type ShaderCycler struct {
+	Shaders []Shader
+	*CyclableInt
+}
+
+func NewShaderCyclerFromArray(shaders []Shader) *ShaderCycler {
+	return &ShaderCycler{
+		Shaders:     shaders,
+		CyclableInt: NewCyclableInt(0, len(shaders)),
+	}
+}
+
+func NewShaderCycler() *ShaderCycler {
+	return &ShaderCycler{
+		Shaders:     make([]Shader, 0),
+		CyclableInt: NewCyclableInt(0, 0),
+	}
+}
+
+func (sc *ShaderCycler) Add(s Shader) {
+	sc.Shaders = append(sc.Shaders, s)
+}
+
+func (sc *ShaderCycler) Remove(rs Shader) error {
+	ri := -1
+	for i, s := range sc.Shaders {
+		if rs == s {
+			ri = i
+			break
+		}
+	}
+
+	if ri == -1 {
+		return errors.New("could not find shader to remove")
+	}
+
+	sc.Shaders = append(sc.Shaders[:ri], sc.Shaders[ri+1:]...)
+	return nil
+}
+
+func (sc ShaderCycler) Current() Shader {
+	return sc.Shaders[sc.Index()]
+}
 
 type Shader uint32
 
@@ -22,12 +67,12 @@ func MustCompileShader(vertexShaderSource, fragmentShaderSource string) Shader {
 
 // CompileShader create a new shader program.
 func CompileShader(vertexShaderSource, fragmentShaderSource string) (Shader, error) {
-	vertexShader, err := compileShader(vertexShaderSource, gl.VERTEX_SHADER)
+	vertexShader, err := compileShader(vertexShaderSource+"\x00", gl.VERTEX_SHADER)
 	if err != nil {
 		return Shader(math.MaxUint32), err
 	}
 
-	fragmentShader, err := compileShader(fragmentShaderSource, gl.FRAGMENT_SHADER)
+	fragmentShader, err := compileShader(fragmentShaderSource+"\x00", gl.FRAGMENT_SHADER)
 	if err != nil {
 		return Shader(math.MaxUint32), err
 	}

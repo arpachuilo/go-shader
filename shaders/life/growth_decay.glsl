@@ -18,7 +18,7 @@ vec4 getSelf(vec2 coord) {
 }
 
 float update(float cell, float current) {
-	float offset = cell > 0.0 ? gain : decay;
+	float offset = cell > 0.5 ? gain : decay;
 	return current + offset;
 }
 

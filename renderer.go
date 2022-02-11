@@ -19,9 +19,10 @@ type Renderer struct {
 	Program Program
 	Window  *glfw.Window
 
-	Tick          <-chan time.Time
-	RefreshRate   float64
-	Width, Height int
+	Tick              *time.Ticker
+	RefreshRate       float64
+	UnlockedFrameRate bool
+	Width, Height     int
 
 	KeyPressDetection *KeyPressDetection
 	Cmds              CmdChannels
@@ -56,7 +57,7 @@ func (r *Renderer) Setup() {
 
 	// get refresh rate
 	r.RefreshRate = float64(glfw.GetPrimaryMonitor().GetVideoMode().RefreshRate)
-	r.SetTickRate(r.RefreshRate)
+	r.Tick = time.NewTicker(time.Duration(1000/r.RefreshRate) * time.Millisecond)
 
 	// register key press channels
 	r.Cmds.Register(CaptureCmd)
@@ -79,17 +80,24 @@ func (r *Renderer) Setup() {
 	gl.BufferData(gl.ARRAY_BUFFER, len(quadVertices)*4, gl.Ptr(quadVertices), gl.STATIC_DRAW)
 
 	// Configure global settings
-	// gl.ClearColor(0.0, 0.0, 0.0, 1.0)
+	gl.ClearColor(1.0, 1.0, 1.0, 1.0)
 }
 
 func (r *Renderer) SetTickRate(rr float64) {
-	r.Tick = time.Tick(time.Duration(1000/rr) * time.Millisecond)
+	if rr <= 0.0 {
+		r.Tick.Reset(1)
+	} else {
+		r.Tick.Reset(time.Duration(1000/rr) * time.Millisecond)
+	}
+
+	r.UnlockedFrameRate = rr != r.RefreshRate
 }
 
 var frames = 0
 var lastTime time.Time
 
 func (r *Renderer) Start() {
+	// r.Program = NewLiveProgram("./shaders/live_edit.glsl")
 	r.Program = NewLifeProgram()
 	r.Program.Load(r.Window, r.vao, r.vbo)
 	for !r.Window.ShouldClose() {
@@ -98,7 +106,7 @@ func (r *Renderer) Start() {
 		case <-r.Cmds[CaptureCmd]:
 			r.Capture()
 		// frame limiter
-		case <-r.Tick:
+		case <-r.Tick.C:
 			t := glfw.GetTime()
 			frames++
 			currentTime := time.Now()
@@ -139,10 +147,26 @@ func (r *Renderer) KeyCallback(w *glfw.Window, key glfw.Key, scancode int, actio
 
 	// call renderer key callbacks
 	if glfw.Release == action {
+		// close program
+		if key == glfw.KeyEscape {
+			w.SetShouldClose(true)
+		}
+
+		// unlock frame rate
+		if key == glfw.KeyF1 {
+			if r.UnlockedFrameRate {
+				r.SetTickRate(r.RefreshRate)
+			} else {
+				r.SetTickRate(0)
+			}
+		}
+
+		// take screen capture
 		if key == glfw.KeyP {
 			r.Cmds.Issue(CaptureCmd)
 		}
 
+		// record
 		if key == glfw.KeyQ {
 			if !r.Recorder.On {
 				r.Recorder.Start()

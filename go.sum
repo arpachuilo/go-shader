@@ -1,12 +1,15 @@
-github.com/ericpauley/go-quantize v0.0.0-20200331213906-ae555eb2afa4 h1:BBade+JlV/f7JstZ4pitd4tHhpN+w+6I+LyOS7B4fyU=
-github.com/ericpauley/go-quantize v0.0.0-20200331213906-ae555eb2afa4/go.mod h1:H7chHJglrhPPzetLdzBleF8d22WYOv7UM/lEKYiwlKM=
 github.com/go-gl/gl v0.0.0-20211210172815-726fda9656d6 h1:zDw5v7qm4yH7N8C8uWd+8Ii9rROdgWxQuGoJ9WDXxfk=
 github.com/go-gl/gl v0.0.0-20211210172815-726fda9656d6/go.mod h1:9YTyiznxEY1fVinfM7RvRcjRHbw2xLBJ3AAGIT0I4Nw=
 github.com/go-gl/glfw/v3.3/glfw v0.0.0-20211204153444-caad923f49f4 h1:KgfIc81yNEUKNAsF+Mt3C1Cl+iQqKF1r7nWEKzL0c2Y=
 github.com/go-gl/glfw/v3.3/glfw v0.0.0-20211204153444-caad923f49f4/go.mod h1:tQ2UAYgL5IevRw8kRxooKSPJfGvJ9fJQFa0TUsXzTg8=
 github.com/icza/mjpeg v0.0.0-20210726201846-5ff75d3c479f h1:907GjB0sqx3+XKOz5tSeAi8Z9ED7WwQU9hXoclDp+jg=
 github.com/icza/mjpeg v0.0.0-20210726201846-5ff75d3c479f/go.mod h1:Eja3x31oRrEOzl6ihhsxY23gXaTYWLP3Gwj5nMAJ7m0=
+github.com/rjeczalik/notify v0.0.0-20181126183243-629144ba06a1 h1:FLWDC+iIP9BWgYKvWKKtOUZux35LIQNAuIzp/63RQJU=
+github.com/rjeczalik/notify v0.0.0-20181126183243-629144ba06a1/go.mod h1:aErll2f0sUX9PXZnVNyeiObbmTlk5jnMoCa4QEjJeqM=
 golang.org/x/image v0.0.0-20211028202545-6944b10bf410 h1:hTftEOvwiOq2+O8k2D5/Q7COC7k5Qcrgc2TFURJYnvQ=
 golang.org/x/image v0.0.0-20211028202545-6944b10bf410/go.mod h1:023OzeP/+EPmXeapQh35lcL3II3LrY8Ic+EFFKVhULM=
+golang.org/x/sys v0.0.0-20180926160741-c2ed4eda69e7/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
+golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c h1:F1jZWGFhYfh0Ci55sIpILtKKK8p3i2/krTr0H1rg74I=
+golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/text v0.3.6/go.mod h1:5Zoc/QRtKVWzQhOtBMvqHzDpF6irO9z98xDceosuGiQ=
 golang.org/x/tools v0.0.0-20180917221912-90fa682c2a6e/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
