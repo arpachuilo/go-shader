@@ -13,6 +13,24 @@ var vertexShader string
 var fragShader string
 
 // compute shaders
+//go:embed shaders/fractals/mandelbrot.glsl
+var mandelbrotShader string
+
+//go:embed shaders/fractals/julia.glsl
+var juliaShader string
+
+//go:embed shaders/life/smooth_out.glsl
+var smoothOutputShader string
+
+//go:embed shaders/gaussianX.glsl
+var gaussXShader string
+
+//go:embed shaders/gaussianY.glsl
+var gaussYShader string
+
+//go:embed shaders/life/smooth.glsl
+var smoothShader string
+
 //go:embed shaders/life/cyclic.glsl
 var cyclicShader string
 

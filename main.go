@@ -1,6 +1,8 @@
 package main
 
 import (
+	"image"
+	"image/color"
 	"log"
 	"runtime"
 
@@ -8,8 +10,8 @@ import (
 )
 
 // window settings
-var windowWidth = 800
-var windowHeight = 600
+var windowWidth = 1280
+var windowHeight = 720
 
 func init() {
 	// GLFW event handling must run on the main OS thread
@@ -24,21 +26,35 @@ func main() {
 	defer glfw.Terminate()
 
 	// setup window
-	glfw.WindowHint(glfw.Resizable, glfw.True)
+	// opengl
 	glfw.WindowHint(glfw.ContextVersionMajor, 4)
 	glfw.WindowHint(glfw.ContextVersionMinor, 1)
 	glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile)
 	glfw.WindowHint(glfw.OpenGLForwardCompatible, glfw.True)
 
-	// glfw.WindowHint(glfw.CocoaRetinaFramebuffer, glfw.True)
-	// glfw.WindowHint(glfw.SRGBCapable, glfw.True)
+	// basic
+	glfw.WindowHint(glfw.Resizable, glfw.True)
+	glfw.WindowHint(glfw.CenterCursor, glfw.True)
+
+	// mac os
+	glfw.WindowHint(glfw.CocoaRetinaFramebuffer, glfw.True)
+	glfw.WindowHintString(glfw.CocoaFrameNAME, "go-opengl")
 	window, err := glfw.CreateWindow(windowWidth, windowHeight, "Visuals", nil, nil)
 	if err != nil {
 		panic(err)
 	}
 	window.MakeContextCurrent()
-	// TODO: Add program icon
-	// window.SetIcon()
+
+	// disable cursor
+	window.SetInputMode(glfw.CursorMode, glfw.CursorDisabled)
+
+	img := image.NewNRGBA(image.Rect(0, 0, 64, 64))
+	for x := 0; x < 64; x++ {
+		for y := 0; y < 64; y++ {
+			img.Set(x, y, color.RGBA{255, 0, 0, 255})
+		}
+	}
+	window.SetIcon([]image.Image{img})
 
 	renderer := NewRenderer(window)
 	renderer.Setup()

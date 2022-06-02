@@ -38,24 +38,24 @@ func NewLiveEditProgram(filename string) Program {
 	}
 }
 
-func (p *LiveEditProgram) watch() {
-	p.watcher = make(chan notify.EventInfo, 1)
-	p.pending = make(chan string, 1)
-	err := notify.Watch(p.filename, p.watcher, notify.Create, notify.Write)
+func (self *LiveEditProgram) watch() {
+	self.watcher = make(chan notify.EventInfo, 1)
+	self.pending = make(chan string, 1)
+	err := notify.Watch(self.filename, self.watcher, notify.Create, notify.Write)
 	if err != nil {
 		panic(err)
 	}
-	defer notify.Stop(p.watcher)
+	defer notify.Stop(self.watcher)
 
 	// initial file load
-	data, err := ioutil.ReadFile(p.filename)
+	data, err := ioutil.ReadFile(self.filename)
 	if err == nil {
-		p.pending <- string(data)
+		self.pending <- string(data)
 	}
 
 	for {
 		select {
-		case ei := <-p.watcher:
+		case ei := <-self.watcher:
 			event := ei.Event()
 			switch event {
 			case notify.Rename:
@@ -64,55 +64,55 @@ func (p *LiveEditProgram) watch() {
 				log.Println("modified file:", ei.Path())
 
 				// read file in
-				data, err := ioutil.ReadFile(p.filename)
+				data, err := ioutil.ReadFile(self.filename)
 				if err != nil {
 					log.Println("error:", err)
 					continue
 				}
 
 				// attempt to create new shader
-				p.pending <- string(data)
+				self.pending <- string(data)
 			}
 		}
 	}
 
 }
 
-func (p *LiveEditProgram) Load(window *glfw.Window, vao, vbo uint32) {
-	p.Window = window
-	p.vao = vao
-	p.vbo = vbo
+func (self *LiveEditProgram) Load(window *glfw.Window, vao, vbo uint32) {
+	self.Window = window
+	self.vao = vao
+	self.vbo = vbo
 	width, height := window.GetSize()
 
 	// create textures
 	img := *image.NewRGBA(image.Rect(0, 0, width, height))
-	p.texture = LoadTexture(&img)
+	self.texture = LoadTexture(&img)
 
-	p.shader = MustCompileShader(vertexShader, fragShader)
+	self.shader = MustCompileShader(vertexShader, fragShader)
 
-	go p.watch()
+	go self.watch()
 }
 
-func (p *LiveEditProgram) compile(code string) {
+func (self *LiveEditProgram) compile(code string) {
 	newShader, err := CompileShader(vertexShader, code)
 	if err != nil {
 		log.Println("error", err)
 		return
 	}
 
-	p.shader = newShader
-	p.history = append(p.history, code)
+	self.shader = newShader
+	self.history = append(self.history, code)
 }
 
-func (p *LiveEditProgram) run(t float64) {
-	width, height := p.Window.GetSize()
-	mx, my := p.Window.GetCursorPos()
+func (self *LiveEditProgram) run(t float64) {
+	width, height := self.Window.GetSize()
+	mx, my := self.Window.GetCursorPos()
 
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
-	gl.BindVertexArray(p.vao)
-	p.texture.Activate(gl.TEXTURE0)
+	gl.BindVertexArray(self.vao)
+	self.texture.Activate(gl.TEXTURE0)
 
-	p.shader.Use().
+	self.shader.Use().
 		Uniform1i("state", 0).
 		Uniform1f("time", float32(t)).
 		Uniform2f("mouse", float32(mx), float32(height)-float32(my)).
@@ -120,18 +120,18 @@ func (p *LiveEditProgram) run(t float64) {
 	gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
 }
 
-func (p *LiveEditProgram) Render(t float64) {
+func (self *LiveEditProgram) Render(t float64) {
 	select {
-	case code := <-p.pending:
-		p.compile(code)
+	case code := <-self.pending:
+		self.compile(code)
 	default:
-		p.run(t)
+		self.run(t)
 	}
 }
 
-func (p *LiveEditProgram) KeyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+func (self *LiveEditProgram) KeyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 }
 
-func (p *LiveEditProgram) ResizeCallback(w *glfw.Window, width int, height int) {
-	p.texture.Resize(width, height)
+func (self *LiveEditProgram) ResizeCallback(w *glfw.Window, width int, height int) {
+	self.texture.Resize(width, height)
 }

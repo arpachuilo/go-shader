@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/gen2brain/beeep"
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
 	"github.com/icza/mjpeg"
@@ -29,15 +30,17 @@ func NewRecorder(window *glfw.Window) *Recorder {
 	}
 }
 
-func (r *Recorder) Start() {
-	r.On = true
+func (self *Recorder) Start() {
+	self.On = true
 
-	r.frames = make([]*image.RGBA, 0)
-	r.startTime = time.Now()
+	self.frames = make([]*image.RGBA, 0)
+	self.startTime = time.Now()
+
+	beeep.Notify("Video Recording Started", "Press Q to end recording", "")
 }
 
-func (r *Recorder) Capture() {
-	w, h := r.Window.GetFramebufferSize()
+func (self *Recorder) Capture() {
+	w, h := self.Window.GetFramebufferSize()
 	img := *image.NewRGBA(image.Rect(0, 0, w, h))
 	gl.ReadPixels(
 		0, 0,
@@ -47,12 +50,13 @@ func (r *Recorder) Capture() {
 		gl.Ptr(img.Pix),
 	)
 
-	r.frames = append(r.frames, &img)
+	self.frames = append(self.frames, &img)
 }
 
-func (r *Recorder) End() {
-	r.On = false
-	r.endTime = time.Now()
+func (self *Recorder) End() {
+	self.On = false
+	self.endTime = time.Now()
+	beeep.Notify("Video Recording Finished", "Please wait before closing while your video is encoded", "")
 	go func(r *Recorder) {
 
 		// create sub-folders
@@ -89,10 +93,11 @@ func (r *Recorder) End() {
 			}
 		}
 		fmt.Println("video saved")
+		beeep.Notify("Video Recording Saved!", name, "")
 		err = os.Remove(name + ".idx_")
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
-	}(r)
+	}(self)
 }

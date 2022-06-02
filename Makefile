@@ -5,7 +5,7 @@ GOCLEAN=$(GOCMD) clean
 GOTEST=$(GOCMD) test
 GOGET=$(GOCMD) get
 
-BINARY_NAME=bin/trip
+BINARY_NAME=bin/opengl_programs
     
 all: test build run
 build:

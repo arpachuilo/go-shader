@@ -10,40 +10,27 @@ import (
 	"github.com/go-gl/glfw/v3.3/glfw"
 )
 
-var RecolorCmd = "recolor"
-
-type LifeMode int
-
-const (
-	LifeStd LifeMode = iota
-	LifeCyclic
-)
-
-type LifeProgram struct {
+type SmoothLifeProgram struct {
 	Window *glfw.Window
-
-	// rule set
-	survive []int32
-	birth   []int32
 
 	// state
 	frame      int32
 	paused     bool
-	mode       LifeMode
 	cursorSize float64
 	cmds       CmdChannels
 
 	// textures
-	prevTexture        *Texture
-	nextTexture        *Texture
-	growthDecayTexture *Texture
+	textureA *Texture
+	textureB *Texture
+	textureC *Texture
 
-	// compute shaders
-	lifeShader        Shader
-	cyclicShader      Shader
-	growthDecayShader Shader
+	// shaders
+	smoothShader Shader
+	gaussX       Shader
+	gaussY       Shader
 
 	// output shaders
+	// outputShader Shader
 	outputShaders CyclicArray[Shader]
 	gradientIndex CyclicArray[int32]
 
@@ -51,20 +38,13 @@ type LifeProgram struct {
 	fbo, vao, vbo uint32
 }
 
-func NewLifeProgram() Program {
-	survive := []int32{-1, -1, 2, 3, -1, -1, -1, -1, -1}
-	birth := []int32{-1, -1, -1, 3, -1, -1, -1, -1, -1}
-
+func NewSmoothLifeProgram() Program {
 	cmds := NewCmdChannels()
 	cmds.Register(RecolorCmd)
 
-	return &LifeProgram{
-		survive: survive,
-		birth:   birth,
-
+	return &SmoothLifeProgram{
 		frame:      0,
 		paused:     false,
-		mode:       LifeStd,
 		cursorSize: 0.025,
 
 		cmds:          cmds,
@@ -72,7 +52,7 @@ func NewLifeProgram() Program {
 	}
 }
 
-func (self *LifeProgram) Load(window *glfw.Window, vao, vbo uint32) {
+func (self *SmoothLifeProgram) Load(window *glfw.Window, vao, vbo uint32) {
 	self.Window = window
 	self.vao = vao
 	self.vbo = vbo
@@ -87,24 +67,24 @@ func (self *LifeProgram) Load(window *glfw.Window, vao, vbo uint32) {
 			r := uint8(rand.Intn(255))
 			g := uint8(rand.Intn(255))
 			b := uint8(rand.Intn(255))
-			a := uint8(rand.Intn(255))
+			// a := uint8(rand.Intn(255))
 
-			c := color.RGBA{r, g, b, a}
+			c := color.RGBA{r, g, b, 255.0}
 			img1.Set(x, y, c)
-			img2.Set(x, y, c)
-			img3.Set(x, y, color.White)
+			img2.Set(x, y, color.Black)
+			img3.Set(x, y, color.Black)
 		}
 	}
 
 	// create compute textures
-	self.prevTexture = LoadTexture(&img1)
-	self.nextTexture = LoadTexture(&img2)
-	self.growthDecayTexture = LoadTexture(&img3)
+	self.textureA = LoadTexture(&img1)
+	self.textureB = LoadTexture(&img2)
+	self.textureC = LoadTexture(&img3)
 
 	// create compute shaders
-	self.cyclicShader = MustCompileShader(vertexShader, cyclicShader)
-	self.lifeShader = MustCompileShader(vertexShader, golShader)
-	self.growthDecayShader = MustCompileShader(vertexShader, gainShader)
+	self.smoothShader = MustCompileShader(vertexShader, smoothShader)
+	self.gaussX = MustCompileShader(vertexShader, gaussXShader)
+	self.gaussY = MustCompileShader(vertexShader, gaussYShader)
 
 	// create output shaders
 	self.outputShaders = *NewCyclicArray([]Shader{
@@ -119,6 +99,8 @@ func (self *LifeProgram) Load(window *glfw.Window, vao, vbo uint32) {
 		MustCompileShader(vertexShader, rgbaShader),
 	})
 
+	// self.outputShader = MustCompileShader(vertexShader, smoothOutputShader)
+
 	// create framebuffers
 	gl.GenFramebuffers(1, &self.fbo)
 	gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
@@ -126,106 +108,80 @@ func (self *LifeProgram) Load(window *glfw.Window, vao, vbo uint32) {
 	self.Window.SetScrollCallback(self.ScrollCallback)
 }
 
-func (self *LifeProgram) recolor() {
+func (self *SmoothLifeProgram) recolor() {
 	width, height := self.Window.GetSize()
-
 	// use copy program
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
 	gl.BindVertexArray(self.vao)
-
-	switch self.mode {
-	case LifeStd:
-		self.growthDecayTexture.Activate(gl.TEXTURE0)
-	case LifeCyclic:
-		self.prevTexture.Activate(gl.TEXTURE0)
-	}
+	self.textureA.Activate(gl.TEXTURE0)
 
 	self.outputShaders.Current().Use().
 		Uniform1i("index", *self.gradientIndex.Current()).
 		Uniform1i("state", 0).
 		Uniform2f("scale", float32(width), float32(height))
 	gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
-
 }
 
-func (self *LifeProgram) life(t float64) {
+func (self *SmoothLifeProgram) smooth(t float64) {
 	width, height := self.Window.GetSize()
 	mx, my := self.Window.GetCursorPos()
+	mb1 := self.Window.GetMouseButton(glfw.MouseButton1)
+	mb2 := self.Window.GetMouseButton(glfw.MouseButton2)
 
-	// use gol program
+	// use smooth life program
 	gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
-	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, self.nextTexture.Handle, 0)
+	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, self.textureA.Handle, 0)
 
 	gl.BindVertexArray(self.vao)
-	self.prevTexture.Activate(gl.TEXTURE0)
+	self.textureA.Activate(gl.TEXTURE0)
+	self.textureC.Activate(gl.TEXTURE1)
 
-	self.lifeShader.Use().
-		Uniform1iv("s", self.survive).
-		Uniform1iv("b", self.birth).
-		Uniform1i("state", 0).
+	self.smoothShader.Use().
+		Uniform1i("inputA", 0).
+		Uniform1i("inputC", 1).
+		Uniform1i("frame", self.frame).
+		Uniform1f("cursorSize", float32(self.cursorSize)).
+		Uniform1f("time", float32(t)).
+		Uniform2f("scale", float32(width), float32(height)).
+		Uniform4f("mouse", float32(mx), float32(height)-float32(my), float32(mb1), float32(mb2))
+	gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
+
+	// use gauss x
+	gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
+	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, self.textureB.Handle, 0)
+
+	gl.BindVertexArray(self.vao)
+	self.textureA.Activate(gl.TEXTURE0)
+
+	self.gaussX.Use().
+		Uniform1i("inputA", 0).
+		Uniform1i("frame", self.frame).
 		Uniform1f("cursorSize", float32(self.cursorSize)).
 		Uniform1f("time", float32(t)).
 		Uniform2f("scale", float32(width), float32(height)).
 		Uniform2f("mouse", float32(mx), float32(height)-float32(my))
 	gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
 
-	// swap texture
-	self.prevTexture, self.nextTexture = self.nextTexture, self.prevTexture
-
-	// use decay program
+	// use gauss y
 	gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
-	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, self.growthDecayTexture.Handle, 0)
+	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, self.textureC.Handle, 0)
 
 	gl.BindVertexArray(self.vao)
-	self.prevTexture.Activate(gl.TEXTURE0)
-	self.growthDecayTexture.Activate(gl.TEXTURE1)
+	self.textureB.Activate(gl.TEXTURE0)
 
-	self.growthDecayShader.Use().
-		Uniform1i("state", 0).
-		Uniform1i("self", 1).
-		Uniform2f("scale", float32(width), float32(height))
-	gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
-
-	// use copy program
-	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
-	gl.BindVertexArray(self.vao)
-	self.growthDecayTexture.Activate(gl.TEXTURE0)
-
-	self.outputShaders.Current().Use().
-		Uniform1i("index", *self.gradientIndex.Current()).
-		Uniform1i("state", 0).
-		Uniform2f("scale", float32(width), float32(height))
-	gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
-
-}
-
-func (self *LifeProgram) cyclic(t float64) {
-	width, height := self.Window.GetSize()
-	mx, my := self.Window.GetCursorPos()
-
-	// use cyclic life program
-	gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
-	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, self.nextTexture.Handle, 0)
-
-	gl.BindVertexArray(self.vao)
-	self.prevTexture.Activate(gl.TEXTURE0)
-
-	self.cyclicShader.Use().
-		Uniform1f("stages", 16.0).
-		Uniform1i("state", 0).
+	self.gaussY.Use().
+		Uniform1i("inputB", 0).
+		Uniform1i("frame", self.frame).
 		Uniform1f("cursorSize", float32(self.cursorSize)).
 		Uniform1f("time", float32(t)).
 		Uniform2f("scale", float32(width), float32(height)).
 		Uniform2f("mouse", float32(mx), float32(height)-float32(my))
 	gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
 
-	// swap texture
-	self.prevTexture, self.nextTexture = self.nextTexture, self.prevTexture
-
 	// use copy program
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
 	gl.BindVertexArray(self.vao)
-	self.prevTexture.Activate(gl.TEXTURE0)
+	self.textureA.Activate(gl.TEXTURE0)
 
 	self.outputShaders.Current().Use().
 		Uniform1i("index", *self.gradientIndex.Current()).
@@ -234,7 +190,7 @@ func (self *LifeProgram) cyclic(t float64) {
 	gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
 }
 
-func (self *LifeProgram) Render(t float64) {
+func (self *SmoothLifeProgram) Render(t float64) {
 	select {
 	case <-self.cmds[RecolorCmd]:
 		self.recolor()
@@ -245,16 +201,11 @@ func (self *LifeProgram) Render(t float64) {
 		}
 
 		self.frame = self.frame + 1
-		switch self.mode {
-		case LifeStd:
-			self.life(t)
-		case LifeCyclic:
-			self.cyclic(t)
-		}
+		self.smooth(t)
 	}
 }
 
-func (self *LifeProgram) ScrollCallback(w *glfw.Window, xoff float64, yoff float64) {
+func (self *SmoothLifeProgram) ScrollCallback(w *glfw.Window, xoff float64, yoff float64) {
 	if yoff > 0 {
 		self.cursorSize = math.Max(0, self.cursorSize-0.005)
 	} else if yoff < 0 {
@@ -262,20 +213,16 @@ func (self *LifeProgram) ScrollCallback(w *glfw.Window, xoff float64, yoff float
 	}
 }
 
-func (self *LifeProgram) ResizeCallback(w *glfw.Window, width int, height int) {
-	self.prevTexture.Resize(width, height)
-	self.nextTexture.Resize(width, height)
-	self.growthDecayTexture.Resize(width, height)
+func (self *SmoothLifeProgram) ResizeCallback(w *glfw.Window, width int, height int) {
+	self.textureA.Resize(width, height)
+	self.textureB.Resize(width, height)
+	self.textureC.Resize(width, height)
 }
 
-func (self *LifeProgram) KeyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+func (self *SmoothLifeProgram) KeyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 	if action == glfw.Release {
-		if key == glfw.Key1 {
-			self.mode = LifeStd
-		}
-
-		if key == glfw.Key2 {
-			self.mode = LifeCyclic
+		if key == glfw.KeySpace {
+			self.paused = !self.paused
 		}
 
 		if key == glfw.KeyJ {
@@ -296,10 +243,6 @@ func (self *LifeProgram) KeyCallback(w *glfw.Window, key glfw.Key, scancode int,
 		if key == glfw.KeyL {
 			self.gradientIndex.Next()
 			self.cmds.Issue(RecolorCmd)
-		}
-
-		if key == glfw.KeySpace {
-			self.paused = !self.paused
 		}
 	}
 }

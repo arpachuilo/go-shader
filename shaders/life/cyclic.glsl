@@ -2,6 +2,7 @@
 uniform float stages;
 uniform sampler2D state;
 
+uniform float cursorSize;
 uniform float time;
 uniform vec2 scale;
 uniform vec2 mouse;
@@ -52,7 +53,7 @@ void main() {
   if (mouse.x < (0.01 * scale.x) && time > 1) {
     outputColor = vec4(0.0);
     return;
-  } else if (mouse.x > (0.99 * scale.x) || length(pos-mouse) < (0.025 * scale.x)) {
+  } else if (mouse.x > (0.99 * scale.x) || length(pos-mouse) < (cursorSize * scale.x)) {
     outputColor = vec4(
       random(pos / scale),
       random(mouse / scale),

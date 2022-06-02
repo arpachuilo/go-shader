@@ -2,85 +2,76 @@ package main
 
 import "errors"
 
-// CyclableInt cyclable int [min, max)
-type CyclableInt struct {
-	min   int
-	max   int
+// CyclicArray
+type CyclicArray[T any] struct {
 	index int
+	data  []T
 }
 
-// NewCyclableInt create new cyclable
-func NewCyclableInt(min, max int) *CyclableInt {
-	return &CyclableInt{
-		min:   min,
-		max:   max,
-		index: min,
+func NewCyclicArray[T any](data []T) *CyclicArray[T] {
+	index := 0
+	if len(data) == 0 {
+		index = -1
+	}
+
+	return &CyclicArray[T]{
+		index: index,
+		data:  data,
 	}
 }
 
-// Index return current index
-func (c CyclableInt) Index() int {
-	return c.index
-}
-
-// Min return current min
-func (c CyclableInt) Min() int {
-	return c.min
-}
-
-// Max return current max
-func (c CyclableInt) Max() int {
-	return c.max
-}
-
-// SetIndex set current index (wraps) and return it
-func (c *CyclableInt) SetIndex(i int) int {
-	c.index = i
-	if c.index > c.max-1 {
-		c.index = c.min
+// OffsetIndex set current index (wraps) and return it
+func (self *CyclicArray[T]) OffsetIndex(offset int) int {
+	self.index += offset
+	if self.index > len(self.data)-1 {
+		self.index = 0
 	}
 
-	if c.index < c.min {
-		c.index = c.max - 1
+	if self.index < 0 {
+		self.index = len(self.data) - 1
 	}
 
-	return c.index
+	return self.index
 }
 
-func (c *CyclableInt) SetRange(min, max int) error {
-	if min <= max {
-		c.max = max
-		c.min = min
+func (self *CyclicArray[T]) Add(v T) {
+	self.data = append(self.data, v)
+}
+
+func (self *CyclicArray[T]) Remove(i int) error {
+	if i < 0 || i >= len(self.data) {
+		return errors.New("out of bounds index")
+	}
+
+	self.data = append(self.data[:i], self.data[i+1:]...)
+	self.OffsetIndex(0)
+	return nil
+}
+
+func (self CyclicArray[T]) Index() int {
+	return self.index
+}
+
+func (self CyclicArray[T]) Current() *T {
+	if self.index == -1 {
 		return nil
 	}
 
-	return errors.New("cannot set min greater than max")
+	return &self.data[self.index]
 }
 
-func (c *CyclableInt) SetMin(min int) error {
-	if min > c.max {
-		return errors.New("cannot set min to value greater than min")
+func (self *CyclicArray[T]) Next() *T {
+	if self.index == -1 {
+		return nil
 	}
 
-	c.max = min
-	return nil
+	return &self.data[self.OffsetIndex(1)]
 }
 
-func (c *CyclableInt) SetMax(max int) error {
-	if max <= c.min {
-		return errors.New("cannot set max to value smaller or equal to min")
+func (self *CyclicArray[T]) Previous() *T {
+	if self.index == -1 {
+		return nil
 	}
 
-	c.max = max
-	return nil
-}
-
-// Next go to next available index and return it
-func (c *CyclableInt) Next() int {
-	return c.SetIndex(c.index + 1)
-}
-
-// Prev go to previous available index and return it
-func (c *CyclableInt) Prev() int {
-	return c.SetIndex(c.index - 1)
+	return &self.data[self.OffsetIndex(-1)]
 }

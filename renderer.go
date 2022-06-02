@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/gen2brain/beeep"
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
 )
@@ -16,8 +17,10 @@ var CaptureCmd = "capture"
 
 // Renderer handles running our programs
 type Renderer struct {
-	Program Program
-	Window  *glfw.Window
+	Program        Program
+	Window         *glfw.Window
+	wPosX, wPosY   int
+	wSizeX, wSizeY int
 
 	Tick              *time.Ticker
 	RefreshRate       float64
@@ -46,89 +49,92 @@ func NewRenderer(window *glfw.Window) *Renderer {
 	}
 }
 
-func (r *Renderer) Setup() {
+func (self *Renderer) Setup() {
 	// Initialize Glow
 	if err := gl.Init(); err != nil {
 		panic(err)
 	}
 
 	// get current resolution
-	r.Width, r.Height = r.Window.GetSize()
+	self.Width, self.Height = self.Window.GetSize()
 
 	// get refresh rate
-	r.RefreshRate = float64(glfw.GetPrimaryMonitor().GetVideoMode().RefreshRate)
-	r.Tick = time.NewTicker(time.Duration(1000/r.RefreshRate) * time.Millisecond)
+	self.RefreshRate = float64(glfw.GetPrimaryMonitor().GetVideoMode().RefreshRate)
+	self.Tick = time.NewTicker(time.Duration(1000/self.RefreshRate) * time.Millisecond)
 
 	// register key press channels
-	r.Cmds.Register(CaptureCmd)
+	self.Cmds.Register(CaptureCmd)
 
 	// print some info
 	version := gl.GoStr(gl.GetString(gl.VERSION))
 	fmt.Println("OpenGL version", version)
-	fmt.Println("Refresh rate", r.RefreshRate)
+	fmt.Println("Refresh rate", self.RefreshRate)
 
 	// register callbacks
-	r.Window.SetKeyCallback(r.KeyCallback)
-	r.Window.SetSizeCallback(r.ResizeCallback)
+	self.Window.SetKeyCallback(self.KeyCallback)
+	self.Window.SetSizeCallback(self.ResizeCallback)
 
 	// configure the vertex data
-	gl.GenVertexArrays(1, &r.vao)
-	gl.BindVertexArray(r.vao)
+	gl.GenVertexArrays(1, &self.vao)
+	gl.BindVertexArray(self.vao)
 
-	gl.GenBuffers(1, &r.vbo)
-	gl.BindBuffer(gl.ARRAY_BUFFER, r.vbo)
+	gl.GenBuffers(1, &self.vbo)
+	gl.BindBuffer(gl.ARRAY_BUFFER, self.vbo)
 	gl.BufferData(gl.ARRAY_BUFFER, len(quadVertices)*4, gl.Ptr(quadVertices), gl.STATIC_DRAW)
 
 	// Configure global settings
 	gl.ClearColor(1.0, 1.0, 1.0, 1.0)
 }
 
-func (r *Renderer) SetTickRate(rr float64) {
+func (self *Renderer) SetTickRate(rr float64) {
 	if rr <= 0.0 {
-		r.Tick.Reset(1)
+		self.Tick.Reset(1)
 	} else {
-		r.Tick.Reset(time.Duration(1000/rr) * time.Millisecond)
+		self.Tick.Reset(time.Duration(1000/rr) * time.Millisecond)
 	}
 
-	r.UnlockedFrameRate = rr != r.RefreshRate
+	self.UnlockedFrameRate = rr != self.RefreshRate
 }
 
 var frames = 0
 var lastTime time.Time
 
-func (r *Renderer) Start() {
-	r.Program = NewLiveEditProgram("./shaders/live_edit.glsl")
-	// r.Program = NewLifeProgram()
-	r.Program.Load(r.Window, r.vao, r.vbo)
-	for !r.Window.ShouldClose() {
+func (self *Renderer) Start() {
+	// r.Program = NewLiveEditProgram("./shaders/live_edit.glsl")
+	// self.Program = NewLifeProgram()
+	self.Program = NewSmoothLifeProgram()
+	// r.Program = NewMandelbrotProgram()
+	// r.Program = NewJuliaProgram()
+	self.Program.Load(self.Window, self.vao, self.vbo)
+	for !self.Window.ShouldClose() {
 		select {
 		// capture frame
-		case <-r.Cmds[CaptureCmd]:
-			r.Capture()
+		case <-self.Cmds[CaptureCmd]:
+			self.Capture()
 		// frame limiter
-		case <-r.Tick.C:
+		case <-self.Tick.C:
 			t := glfw.GetTime()
 			frames++
 			currentTime := time.Now()
 			delta := currentTime.Sub(lastTime)
 			if delta > time.Second {
 				fps := frames / int(delta.Seconds())
-				r.Window.SetTitle(fmt.Sprintf("FPS: %v", fps))
+				self.Window.SetTitle(fmt.Sprintf("FPS: %v", fps))
 
 				lastTime = currentTime
 				frames = 0
 			}
 
 			// run
-			r.Program.Render(t)
+			self.Program.Render(t)
 
 			// maintenance
-			r.Window.SwapBuffers()
+			self.Window.SwapBuffers()
 			glfw.PollEvents()
 
 			// record
-			if r.Recorder.On {
-				r.Recorder.Capture()
+			if self.Recorder.On {
+				self.Recorder.Capture()
 			}
 		}
 	}
@@ -136,51 +142,76 @@ func (r *Renderer) Start() {
 	glfw.Terminate()
 }
 
-func (r *Renderer) ResizeCallback(w *glfw.Window, width int, height int) {
-	r.Width, r.Height = width, height
+func (self *Renderer) ResizeCallback(w *glfw.Window, width int, height int) {
+	self.Width, self.Height = width, height
 
-	r.Program.ResizeCallback(w, width, height)
+	self.Program.ResizeCallback(w, width, height)
 }
 
-func (r *Renderer) KeyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
-	r.Program.KeyCallback(w, key, scancode, action, mods)
+func (self *Renderer) KeyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+	self.Program.KeyCallback(w, key, scancode, action, mods)
 
 	// call renderer key callbacks
 	if glfw.Release == action {
-		// close program
 		if key == glfw.KeyEscape {
+			if self.Window.GetInputMode(glfw.CursorMode) == glfw.CursorDisabled {
+				self.Window.SetInputMode(glfw.CursorMode, glfw.CursorNormal)
+			} else {
+				self.Window.SetInputMode(glfw.CursorMode, glfw.CursorDisabled)
+			}
+		}
+
+		// close program
+		if key == glfw.KeyW && glfw.ModSuper == mods {
 			w.SetShouldClose(true)
 		}
 
+		// if key == glfw.KeyF && glfw.ModControl == mods {
+		// 	mon := w.GetMonitor()
+		//
+		// 	if mon == nil { // not fullscreen
+		// 		// backup previous window size and position
+		// 		r.wPosX, r.wPosY = w.GetPos()
+		// 		r.wSizeX, r.wSizeY = w.GetSize()
+		//
+		// 		// set fullscreen on primary monitor
+		// 		mon = glfw.GetPrimaryMonitor()
+		// 		vm := mon.GetVideoMode()
+		// 		w.SetMonitor(mon, 0, 0, vm.Width, vm.Height, 0)
+		// 	} else { // already fulllscreen
+		// 		w.SetMonitor(nil, r.wPosX, r.wPosY, r.wSizeX, r.wSizeY, 0)
+		// 	}
+		// }
+
 		// unlock frame rate
 		if key == glfw.KeyF1 {
-			if r.UnlockedFrameRate {
-				r.SetTickRate(r.RefreshRate)
+			if self.UnlockedFrameRate {
+				self.SetTickRate(self.RefreshRate)
 			} else {
-				r.SetTickRate(0)
+				self.SetTickRate(0)
 			}
 		}
 
 		// take screen capture
 		if key == glfw.KeyP {
-			r.Cmds.Issue(CaptureCmd)
+			self.Cmds.Issue(CaptureCmd)
 		}
 
 		// record
 		if key == glfw.KeyQ {
-			if !r.Recorder.On {
-				r.Recorder.Start()
+			if !self.Recorder.On {
+				self.Recorder.Start()
 			} else {
-				r.Recorder.End()
+				self.Recorder.End()
 			}
 		}
 	}
 }
 
-func (r *Renderer) Capture() error {
+func (self *Renderer) Capture() error {
 	// create sub-folders
-	subFolder := "cap"
-	folder := fmt.Sprintf("screencaptures/%v/", subFolder)
+	// folder := fmt.Sprintf("screencaptures/%v/", subFolder)
+	folder := "screencaptures/"
 	if _, err := os.Stat(folder); os.IsNotExist(err) {
 		os.MkdirAll(folder, 0700)
 	}
@@ -193,7 +224,7 @@ func (r *Renderer) Capture() error {
 	}
 
 	// create image
-	w, h := r.Window.GetFramebufferSize()
+	w, h := self.Window.GetFramebufferSize()
 	img := *image.NewRGBA(image.Rect(0, 0, w, h))
 
 	// set active frame buffer as main one
@@ -216,6 +247,11 @@ func (r *Renderer) Capture() error {
 		return err
 	}
 
+	err = beeep.Notify("Screenshot Captured!", name, "applet.icns")
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -225,27 +261,27 @@ func NewCmdChannels() CmdChannels {
 	return make(map[string](chan interface{}))
 }
 
-func (lc CmdChannels) Issue(key string) error {
-	if _, ok := lc[key]; !ok {
+func (self CmdChannels) Issue(key string) error {
+	if _, ok := self[key]; !ok {
 		return errors.New("cmd is not registered")
 	}
 
 	go func(chan interface{}) {
-		lc[key] <- nil
-	}(lc[key])
+		self[key] <- nil
+	}(self[key])
 
 	return nil
 }
 
-func (lc CmdChannels) Register(key string) error {
-	if _, ok := lc[key]; ok {
+func (self CmdChannels) Register(key string) error {
+	if _, ok := self[key]; ok {
 		return errors.New("cmd already registered to channel")
 	}
 
-	lc[key] = make(chan interface{})
+	self[key] = make(chan interface{})
 	return nil
 }
 
-func (lc CmdChannels) Unregister(key string) {
-	delete(lc, key)
+func (self CmdChannels) Unregister(key string) {
+	delete(self, key)
 }
