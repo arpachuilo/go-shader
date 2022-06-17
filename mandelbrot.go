@@ -5,6 +5,8 @@ import (
 
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
+
+	"go-trip/assets"
 )
 
 type MandelbrotProgram struct {
@@ -57,18 +59,18 @@ func (self *MandelbrotProgram) Load(window *glfw.Window, vao, vbo uint32) {
 	self.fractalTexture = LoadTexture(&img)
 
 	// create compute shaders
-	self.fractalShader = MustCompileShader(vertexShader, mandelbrotShader)
+	self.fractalShader = MustCompileShader(assets.VertexShader, assets.MandelbrotShader)
 
 	// create output shaders
 	self.outputShaders = *NewCyclicArray([]Shader{
-		MustCompileShader(vertexShader, viridisShader),
-		MustCompileShader(vertexShader, infernoShader),
-		MustCompileShader(vertexShader, magmaShader),
-		MustCompileShader(vertexShader, plasmaShader),
-		MustCompileShader(vertexShader, cividisShader),
-		MustCompileShader(vertexShader, turboShader),
-		MustCompileShader(vertexShader, sinebowShader),
-		MustCompileShader(vertexShader, rgbShader),
+		MustCompileShader(assets.VertexShader, assets.ViridisShader),
+		MustCompileShader(assets.VertexShader, assets.InfernoShader),
+		MustCompileShader(assets.VertexShader, assets.MagmaShader),
+		MustCompileShader(assets.VertexShader, assets.PlasmaShader),
+		MustCompileShader(assets.VertexShader, assets.CividisShader),
+		MustCompileShader(assets.VertexShader, assets.TurboShader),
+		MustCompileShader(assets.VertexShader, assets.SinebowShader),
+		MustCompileShader(assets.VertexShader, assets.RGBShader),
 	})
 
 	// create framebuffers

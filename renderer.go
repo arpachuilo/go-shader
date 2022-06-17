@@ -100,11 +100,7 @@ var frames = 0
 var lastTime time.Time
 
 func (self *Renderer) Start() {
-	// r.Program = NewLiveEditProgram("./shaders/live_edit.glsl")
-	// self.Program = NewLifeProgram()
 	self.Program = NewSmoothLifeProgram()
-	// r.Program = NewMandelbrotProgram()
-	// r.Program = NewJuliaProgram()
 	self.Program.Load(self.Window, self.vao, self.vbo)
 	for !self.Window.ShouldClose() {
 		select {
@@ -138,8 +134,6 @@ func (self *Renderer) Start() {
 			}
 		}
 	}
-
-	glfw.Terminate()
 }
 
 func (self *Renderer) ResizeCallback(w *glfw.Window, width int, height int) {
@@ -161,27 +155,32 @@ func (self *Renderer) KeyCallback(w *glfw.Window, key glfw.Key, scancode int, ac
 			}
 		}
 
+		// program swap
+		if key == glfw.KeyF1 {
+			self.Program = NewLifeProgram()
+			self.Program.Load(self.Window, self.vao, self.vbo)
+		}
+		if key == glfw.KeyF2 {
+			self.Program = NewSmoothLifeProgram()
+			self.Program.Load(self.Window, self.vao, self.vbo)
+		}
+		if key == glfw.KeyF3 {
+			self.Program = NewMandelbrotProgram()
+			self.Program.Load(self.Window, self.vao, self.vbo)
+		}
+		if key == glfw.KeyF4 {
+			self.Program = NewJuliaProgram()
+			self.Program.Load(self.Window, self.vao, self.vbo)
+		}
+		if key == glfw.KeyF5 {
+			self.Program = NewLiveEditProgram("./assets/shaders/live_edit.glsl")
+			self.Program.Load(self.Window, self.vao, self.vbo)
+		}
+
 		// close program
 		if key == glfw.KeyW && glfw.ModSuper == mods {
 			w.SetShouldClose(true)
 		}
-
-		// if key == glfw.KeyF && glfw.ModControl == mods {
-		// 	mon := w.GetMonitor()
-		//
-		// 	if mon == nil { // not fullscreen
-		// 		// backup previous window size and position
-		// 		r.wPosX, r.wPosY = w.GetPos()
-		// 		r.wSizeX, r.wSizeY = w.GetSize()
-		//
-		// 		// set fullscreen on primary monitor
-		// 		mon = glfw.GetPrimaryMonitor()
-		// 		vm := mon.GetVideoMode()
-		// 		w.SetMonitor(mon, 0, 0, vm.Width, vm.Height, 0)
-		// 	} else { // already fulllscreen
-		// 		w.SetMonitor(nil, r.wPosX, r.wPosY, r.wSizeX, r.wSizeY, 0)
-		// 	}
-		// }
 
 		// unlock frame rate
 		if key == glfw.KeyF1 {

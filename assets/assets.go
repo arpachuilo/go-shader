@@ -1,4 +1,4 @@
-package main
+package assets
 
 import (
 	_ "embed"
@@ -7,64 +7,64 @@ import (
 // basic shaders
 
 //go:embed shaders/vertex.glsl
-var vertexShader string
+var VertexShader string
 
 //go:embed shaders/frag.glsl
-var fragShader string
+var FragShader string
 
 // compute shaders
 //go:embed shaders/fractals/mandelbrot.glsl
-var mandelbrotShader string
+var MandelbrotShader string
 
 //go:embed shaders/fractals/julia.glsl
-var juliaShader string
+var JuliaShader string
 
 //go:embed shaders/life/smooth_out.glsl
-var smoothOutputShader string
+var SmoothOutputShader string
 
 //go:embed shaders/gaussianX.glsl
-var gaussXShader string
+var GaussXShader string
 
 //go:embed shaders/gaussianY.glsl
-var gaussYShader string
+var GaussYShader string
 
 //go:embed shaders/life/smooth.glsl
-var smoothShader string
+var SmoothShader string
 
 //go:embed shaders/life/cyclic.glsl
-var cyclicShader string
+var CyclicShader string
 
 //go:embed shaders/life/life.glsl
-var golShader string
+var GOLShader string
 
 //go:embed shaders/life/growth_decay.glsl
-var gainShader string
+var GainShader string
 
 // 3 channel mixers
 //go:embed shaders/rgba_sampler.glsl
-var rgbaShader string
+var RGBAShader string
 
 //go:embed shaders/rgb_sampler.glsl
-var rgbShader string
+var RGBShader string
 
 // 1 channel gradients
 //go:embed shaders/gradients/viridis.glsl
-var viridisShader string
+var ViridisShader string
 
 //go:embed shaders/gradients/magma.glsl
-var magmaShader string
+var MagmaShader string
 
 //go:embed shaders/gradients/inferno.glsl
-var infernoShader string
+var InfernoShader string
 
 //go:embed shaders/gradients/plasma.glsl
-var plasmaShader string
+var PlasmaShader string
 
 //go:embed shaders/gradients/cividis.glsl
-var cividisShader string
+var CividisShader string
 
 //go:embed shaders/gradients/turbo.glsl
-var turboShader string
+var TurboShader string
 
 //go:embed shaders/gradients/sinebow.glsl
-var sinebowShader string
+var SinebowShader string

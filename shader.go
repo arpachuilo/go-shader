@@ -92,6 +92,10 @@ func compileShader(source string, shaderType uint32) (uint32, error) {
 	return shader, nil
 }
 
+func (self Shader) Apply(applyFN func(Shader) Shader) Shader {
+	return applyFN(self)
+}
+
 func (self Shader) Use() Shader {
 	gl.UseProgram(uint32(self))
 	return self

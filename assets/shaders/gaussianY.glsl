@@ -10,8 +10,8 @@ uniform vec2 scale;
 uniform vec2 mouse;
 
 // ---------------------------------------------
-const float or = 18.0;         // outer gaussian std dev
-const float ir = 6.0;          // inner gaussian std dev
+uniform float or = 18.0;         // outer gaussian std dev
+uniform float ir = 6.0;          // inner gaussian std dev
 const int   oc = 50;           // sample cutoff
 // ---------------------------------------------
 

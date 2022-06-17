@@ -8,6 +8,8 @@ import (
 
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
+
+	"go-trip/assets"
 )
 
 var RecolorCmd = "recolor"
@@ -102,21 +104,21 @@ func (self *LifeProgram) Load(window *glfw.Window, vao, vbo uint32) {
 	self.growthDecayTexture = LoadTexture(&img3)
 
 	// create compute shaders
-	self.cyclicShader = MustCompileShader(vertexShader, cyclicShader)
-	self.lifeShader = MustCompileShader(vertexShader, golShader)
-	self.growthDecayShader = MustCompileShader(vertexShader, gainShader)
+	self.cyclicShader = MustCompileShader(assets.VertexShader, assets.CyclicShader)
+	self.lifeShader = MustCompileShader(assets.VertexShader, assets.GOLShader)
+	self.growthDecayShader = MustCompileShader(assets.VertexShader, assets.GainShader)
 
 	// create output shaders
 	self.outputShaders = *NewCyclicArray([]Shader{
-		MustCompileShader(vertexShader, viridisShader),
-		MustCompileShader(vertexShader, infernoShader),
-		MustCompileShader(vertexShader, magmaShader),
-		MustCompileShader(vertexShader, plasmaShader),
-		MustCompileShader(vertexShader, cividisShader),
-		MustCompileShader(vertexShader, turboShader),
-		MustCompileShader(vertexShader, sinebowShader),
-		MustCompileShader(vertexShader, rgbShader),
-		MustCompileShader(vertexShader, rgbaShader),
+		MustCompileShader(assets.VertexShader, assets.ViridisShader),
+		MustCompileShader(assets.VertexShader, assets.InfernoShader),
+		MustCompileShader(assets.VertexShader, assets.MagmaShader),
+		MustCompileShader(assets.VertexShader, assets.PlasmaShader),
+		MustCompileShader(assets.VertexShader, assets.CividisShader),
+		MustCompileShader(assets.VertexShader, assets.TurboShader),
+		MustCompileShader(assets.VertexShader, assets.SinebowShader),
+		MustCompileShader(assets.VertexShader, assets.RGBShader),
+		MustCompileShader(assets.VertexShader, assets.RGBAShader),
 	})
 
 	// create framebuffers

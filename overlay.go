@@ -1,10 +1,13 @@
 package main
 
 import (
+	"errors"
 	"image"
 	"image/color"
+	"image/draw"
 	"strings"
 
+	"github.com/go-gl/gl/v4.1-core/gl"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/basicfont"
 	"golang.org/x/image/math/fixed"
@@ -16,6 +19,88 @@ var defaultLabelY = 14
 var labels = []string{}
 
 var enabled = false
+
+type Character struct {
+	Texture *Texture
+	// Glyph
+}
+
+type Fontmap struct {
+	Characters map[rune]*Character
+}
+
+func MustLoadFont() *Fontmap {
+	f, err := LoadFont()
+	if err != nil {
+		panic(err)
+	}
+
+	return f
+}
+
+func LoadFont() (*Fontmap, error) {
+	// would load font here, using basic font for now
+	characters := make(map[rune]*Character)
+
+	x := 4
+	y := 4
+	p := fixed.Point26_6{fixed.Int26_6(x * 64), fixed.Int26_6(y * 64)}
+	r := rune('a')
+	for r < rune('Z') {
+		dr, mask, _, _, ok := basicfont.Face7x13.Glyph(p, r)
+		if !ok {
+			return nil, errors.New("could not load font Face7x13")
+		}
+
+		rgba := image.NewRGBA(dr)
+		draw.Draw(rgba, rgba.Bounds(), mask, mask.Bounds().Min, draw.Src)
+
+		var texture uint32
+		gl.GenTextures(1, &texture)
+		gl.BindTexture(gl.TEXTURE_2D, texture)
+		gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+		gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+		gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+		gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+		gl.TexImage2D(
+			gl.TEXTURE_2D,
+			0,
+			gl.RGBA,
+			int32(dr.Size().X),
+			int32(dr.Size().Y),
+			0,
+			gl.RGBA,
+			gl.UNSIGNED_BYTE,
+			gl.Ptr(rgba.Pix),
+		)
+
+		character := Character{
+			Texture: &Texture{
+				rgba,
+				texture,
+			},
+		}
+
+		characters[r] = &character
+		r++
+	}
+
+	return &Fontmap{
+		Characters: characters,
+	}, nil
+}
+
+func (self Fontmap) RenderText(s string) {
+	// for _, r := range s {
+	// 	ch := self.Characters[r]
+	// 	bounds, advance, ok := basicfont.Face7x13.GlyphBounds(r)
+	// 	if !ok {
+	// 		continue
+	// 	}
+	//
+	// 	// xpos := x + texture.
+	// }
+}
 
 func AddLabel(label string) {
 	if !enabled {

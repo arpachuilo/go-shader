@@ -39,6 +39,7 @@ func main() {
 	// mac os
 	glfw.WindowHint(glfw.CocoaRetinaFramebuffer, glfw.True)
 	glfw.WindowHintString(glfw.CocoaFrameNAME, "go-opengl")
+
 	window, err := glfw.CreateWindow(windowWidth, windowHeight, "Visuals", nil, nil)
 	if err != nil {
 		panic(err)

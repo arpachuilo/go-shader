@@ -8,12 +8,53 @@ import (
 
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
+
+	"go-trip/assets"
 )
+
+type SmoothLifeRules struct {
+	OR float32
+	IR float32
+
+	B1 float32
+	B2 float32
+	S1 float32
+	S2 float32
+
+	DT float32
+
+	Alpha_N float32
+	Alpha_M float32
+}
+
+func (self *SmoothLifeRules) Apply(shader Shader) Shader {
+	return shader.
+		Uniform1f("or", self.OR).
+		Uniform1f("ir", self.IR)
+}
+
+func NewSmoothLifeRuleSet() *SmoothLifeRules {
+	return &SmoothLifeRules{
+		OR: 18.0,
+		IR: 6.0,
+
+		B1: 0.2,   // 0.19,
+		B2: 0.215, // 0.212,
+		S1: 0.25,  // 0.267,
+		S2: 0.5,   // 0.445,
+
+		DT: 0.2,
+
+		Alpha_M: 0.02, // 0.017,
+		Alpha_N: 0.11, // 0.112,
+	}
+}
 
 type SmoothLifeProgram struct {
 	Window *glfw.Window
 
 	// state
+	rules      *SmoothLifeRules
 	frame      int32
 	paused     bool
 	cursorSize float64
@@ -34,6 +75,9 @@ type SmoothLifeProgram struct {
 	outputShaders CyclicArray[Shader]
 	gradientIndex CyclicArray[int32]
 
+	// fontmap
+	fontmap *Fontmap
+
 	// buffers
 	fbo, vao, vbo uint32
 }
@@ -43,6 +87,8 @@ func NewSmoothLifeProgram() Program {
 	cmds.Register(RecolorCmd)
 
 	return &SmoothLifeProgram{
+		rules: NewSmoothLifeRuleSet(),
+
 		frame:      0,
 		paused:     false,
 		cursorSize: 0.025,
@@ -82,24 +128,24 @@ func (self *SmoothLifeProgram) Load(window *glfw.Window, vao, vbo uint32) {
 	self.textureC = LoadTexture(&img3)
 
 	// create compute shaders
-	self.smoothShader = MustCompileShader(vertexShader, smoothShader)
-	self.gaussX = MustCompileShader(vertexShader, gaussXShader)
-	self.gaussY = MustCompileShader(vertexShader, gaussYShader)
+	self.smoothShader = MustCompileShader(assets.VertexShader, assets.SmoothShader)
+	self.gaussX = MustCompileShader(assets.VertexShader, assets.GaussXShader)
+	self.gaussY = MustCompileShader(assets.VertexShader, assets.GaussYShader)
 
 	// create output shaders
 	self.outputShaders = *NewCyclicArray([]Shader{
-		MustCompileShader(vertexShader, viridisShader),
-		MustCompileShader(vertexShader, infernoShader),
-		MustCompileShader(vertexShader, magmaShader),
-		MustCompileShader(vertexShader, plasmaShader),
-		MustCompileShader(vertexShader, cividisShader),
-		MustCompileShader(vertexShader, turboShader),
-		MustCompileShader(vertexShader, sinebowShader),
-		MustCompileShader(vertexShader, rgbShader),
-		MustCompileShader(vertexShader, rgbaShader),
+		MustCompileShader(assets.VertexShader, assets.ViridisShader),
+		MustCompileShader(assets.VertexShader, assets.InfernoShader),
+		MustCompileShader(assets.VertexShader, assets.MagmaShader),
+		MustCompileShader(assets.VertexShader, assets.PlasmaShader),
+		MustCompileShader(assets.VertexShader, assets.CividisShader),
+		MustCompileShader(assets.VertexShader, assets.TurboShader),
+		MustCompileShader(assets.VertexShader, assets.SinebowShader),
+		MustCompileShader(assets.VertexShader, assets.RGBShader),
+		MustCompileShader(assets.VertexShader, assets.RGBAShader),
 	})
 
-	// self.outputShader = MustCompileShader(vertexShader, smoothOutputShader)
+	self.fontmap = MustLoadFont()
 
 	// create framebuffers
 	gl.GenFramebuffers(1, &self.fbo)
@@ -137,6 +183,7 @@ func (self *SmoothLifeProgram) smooth(t float64) {
 	self.textureC.Activate(gl.TEXTURE1)
 
 	self.smoothShader.Use().
+		Apply(self.rules.Apply).
 		Uniform1i("inputA", 0).
 		Uniform1i("inputC", 1).
 		Uniform1i("frame", self.frame).
@@ -154,6 +201,7 @@ func (self *SmoothLifeProgram) smooth(t float64) {
 	self.textureA.Activate(gl.TEXTURE0)
 
 	self.gaussX.Use().
+		Apply(self.rules.Apply).
 		Uniform1i("inputA", 0).
 		Uniform1i("frame", self.frame).
 		Uniform1f("cursorSize", float32(self.cursorSize)).
@@ -170,6 +218,7 @@ func (self *SmoothLifeProgram) smooth(t float64) {
 	self.textureB.Activate(gl.TEXTURE0)
 
 	self.gaussY.Use().
+		Apply(self.rules.Apply).
 		Uniform1i("inputB", 0).
 		Uniform1i("frame", self.frame).
 		Uniform1f("cursorSize", float32(self.cursorSize)).

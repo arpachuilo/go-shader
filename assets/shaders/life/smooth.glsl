@@ -7,8 +7,9 @@ uniform float time;
 uniform vec2 scale;
 uniform vec4 mouse;
 
-const float or = 18.0;         // outer gaussian std dev
-const float ir = 6.0;          // inner gaussian std dev
+uniform float or = 18.0;         // outer gaussian std dev
+uniform float ir = 6.0;          // inner gaussian std dev
+
 const float b1 = 0.19;         // birth1
 const float b2 = 0.212;        // birth2
 const float s1 = 0.267;        // survival1
