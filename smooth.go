@@ -145,7 +145,7 @@ func (self *SmoothLifeProgram) Load(window *glfw.Window, vao, vbo uint32) {
 		MustCompileShader(assets.VertexShader, assets.RGBAShader),
 	})
 
-	self.fontmap = MustLoadFont()
+	self.fontmap = MustLoadFont(self.vbo, self.vao)
 
 	// create framebuffers
 	gl.GenFramebuffers(1, &self.fbo)

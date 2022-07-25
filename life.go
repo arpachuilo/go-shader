@@ -198,7 +198,6 @@ func (self *LifeProgram) life(t float64) {
 		Uniform1i("state", 0).
 		Uniform2f("scale", float32(width), float32(height))
 	gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
-
 }
 
 func (self *LifeProgram) cyclic(t float64) {

@@ -89,8 +89,10 @@ func (self *Renderer) Setup() {
 func (self *Renderer) SetTickRate(rr float64) {
 	if rr <= 0.0 {
 		self.Tick.Reset(1)
+		glfw.SwapInterval(0)
 	} else {
 		self.Tick.Reset(time.Duration(1000/rr) * time.Millisecond)
+		glfw.SwapInterval(1)
 	}
 
 	self.UnlockedFrameRate = rr != self.RefreshRate
@@ -100,7 +102,7 @@ var frames = 0
 var lastTime time.Time
 
 func (self *Renderer) Start() {
-	self.Program = NewSmoothLifeProgram()
+	self.Program = NewTurtleProgram()
 	self.Program.Load(self.Window, self.vao, self.vbo)
 	for !self.Window.ShouldClose() {
 		select {
@@ -176,6 +178,10 @@ func (self *Renderer) KeyCallback(w *glfw.Window, key glfw.Key, scancode int, ac
 			self.Program = NewLiveEditProgram("./assets/shaders/live_edit.glsl")
 			self.Program.Load(self.Window, self.vao, self.vbo)
 		}
+		if key == glfw.KeyF6 {
+			self.Program = NewTurtleProgram()
+			self.Program.Load(self.Window, self.vao, self.vbo)
+		}
 
 		// close program
 		if key == glfw.KeyW && glfw.ModSuper == mods {
@@ -183,7 +189,7 @@ func (self *Renderer) KeyCallback(w *glfw.Window, key glfw.Key, scancode int, ac
 		}
 
 		// unlock frame rate
-		if key == glfw.KeyF1 {
+		if key == glfw.KeyU {
 			if self.UnlockedFrameRate {
 				self.SetTickRate(self.RefreshRate)
 			} else {

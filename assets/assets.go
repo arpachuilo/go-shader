@@ -13,6 +13,9 @@ var VertexShader string
 var FragShader string
 
 // compute shaders
+//go:embed shaders/turtle.glsl
+var TurtleShader string
+
 //go:embed shaders/fractals/mandelbrot.glsl
 var MandelbrotShader string
 
