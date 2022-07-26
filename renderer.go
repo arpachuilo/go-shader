@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/arpachuilo/go-registrable"
 	"github.com/gen2brain/beeep"
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
@@ -45,11 +46,13 @@ type Renderer struct {
 
 	vao uint32
 	vbo uint32
+
+	*KeyRegister
 }
 
 // NewRenderer Create new renderer
 func NewRenderer(window *glfw.Window) *Renderer {
-	return &Renderer{
+	r := &Renderer{
 		Program: nil,
 		Window:  window,
 
@@ -58,6 +61,11 @@ func NewRenderer(window *glfw.Window) *Renderer {
 
 		Recorder: NewRecorder(window),
 	}
+
+	r.KeyRegister = NewKeyRegister()
+	registrable.RegisterMethods[KeyCallbackRegistration](r)
+
+	return r
 }
 
 func (self *Renderer) Setup() {
@@ -159,73 +167,133 @@ func (self *Renderer) ResizeCallback(w *glfw.Window, width int, height int) {
 	self.Program.ResizeCallback(w, width, height)
 }
 
-func (self *Renderer) KeyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
-	self.Program.KeyCallback(w, key, scancode, action, mods)
-
-	// call renderer key callbacks
-	if glfw.Release == action {
-		if key == glfw.KeyEscape {
-			if self.Window.GetInputMode(glfw.CursorMode) == glfw.CursorDisabled {
-				self.Window.SetInputMode(glfw.CursorMode, glfw.CursorNormal)
-			} else {
-				self.Window.SetInputMode(glfw.CursorMode, glfw.CursorDisabled)
-			}
-		}
-
-		// program swap
-		if key == glfw.KeyF1 {
+func (self *Renderer) SwitchToLife() registrable.Registration {
+	return KeyCallbackRegistration{
+		action: glfw.Release,
+		key:    glfw.KeyF1,
+		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 			self.Program = NewLifeProgram()
 			self.Program.Load(self.Window, self.vao, self.vbo)
-		}
-		if key == glfw.KeyF2 {
-			self.Program = NewSmoothLifeProgram()
-			self.Program.Load(self.Window, self.vao, self.vbo)
-		}
-		if key == glfw.KeyF3 {
+		},
+	}
+}
+
+func (self *Renderer) SwitchToMandelbrot() registrable.Registration {
+	return KeyCallbackRegistration{
+		action: glfw.Release,
+		key:    glfw.KeyF2,
+		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 			self.Program = NewMandelbrotProgram()
 			self.Program.Load(self.Window, self.vao, self.vbo)
-		}
-		if key == glfw.KeyF4 {
+		},
+	}
+}
+
+func (self *Renderer) SwitchToJulia() registrable.Registration {
+	return KeyCallbackRegistration{
+		action: glfw.Release,
+		key:    glfw.KeyF3,
+		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 			self.Program = NewJuliaProgram()
 			self.Program.Load(self.Window, self.vao, self.vbo)
-		}
-		if key == glfw.KeyF5 {
+		},
+	}
+}
+
+func (self *Renderer) SwitchToLiveEdit() registrable.Registration {
+	return KeyCallbackRegistration{
+		action: glfw.Release,
+		key:    glfw.KeyF4,
+		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 			self.Program = NewLiveEditProgram("./assets/shaders/live_edit.glsl")
 			self.Program.Load(self.Window, self.vao, self.vbo)
-		}
-		if key == glfw.KeyF6 {
+		},
+	}
+}
+
+func (self *Renderer) SwitchToTurtle() registrable.Registration {
+	return KeyCallbackRegistration{
+		action: glfw.Release,
+		key:    glfw.KeyF5,
+		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 			self.Program = NewTurtleProgram()
 			self.Program.Load(self.Window, self.vao, self.vbo)
-		}
+		},
+	}
+}
 
-		// close program
-		if key == glfw.KeyW && glfw.ModSuper == mods {
-			w.SetShouldClose(true)
-		}
-
-		// unlock frame rate
-		if key == glfw.KeyU {
+func (self *Renderer) UnlockFramerate() registrable.Registration {
+	return KeyCallbackRegistration{
+		action: glfw.Release,
+		key:    glfw.KeyU,
+		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 			if self.UnlockedFrameRate {
 				self.SetTickRate(self.RefreshRate)
 			} else {
 				self.SetTickRate(0)
 			}
-		}
+		},
+	}
+}
 
-		// take screen capture
-		if key == glfw.KeyP {
+func (self *Renderer) CloseProgram() registrable.Registration {
+	return KeyCallbackRegistration{
+		action: glfw.Release,
+		key:    glfw.KeyW,
+		mods:   glfw.ModSuper,
+		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+			w.SetShouldClose(true)
+		},
+	}
+}
+
+func (self *Renderer) Screencapture() registrable.Registration {
+	return KeyCallbackRegistration{
+		action: glfw.Release,
+		key:    glfw.KeyP,
+		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 			self.Cmds.Issue(CaptureCmd)
-		}
+		},
+	}
+}
 
-		// record
-		if key == glfw.KeyQ {
+func (self *Renderer) Record() registrable.Registration {
+	return KeyCallbackRegistration{
+		action: glfw.Release,
+		key:    glfw.KeyQ,
+		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 			if !self.Recorder.On {
 				self.Recorder.Start()
 			} else {
 				self.Recorder.End()
 			}
-		}
+		},
 	}
+}
+
+func (self *Renderer) ToggleCursor() registrable.Registration {
+	return KeyCallbackRegistration{
+		action: glfw.Release,
+		key:    glfw.KeyEscape,
+		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+			if self.Window.GetInputMode(glfw.CursorMode) == glfw.CursorDisabled {
+				self.Window.SetInputMode(glfw.CursorMode, glfw.CursorNormal)
+			} else {
+				self.Window.SetInputMode(glfw.CursorMode, glfw.CursorDisabled)
+			}
+		},
+	}
+}
+
+func (self *Renderer) KeyCallback(
+	w *glfw.Window,
+	key glfw.Key,
+	scancode int,
+	action glfw.Action,
+	mods glfw.ModifierKey,
+) {
+	self.Program.KeyCallback(w, key, scancode, action, mods)
+	self.KeyRegister.KeyCallback(w, key, scancode, action, mods)
 }
 
 func (self *Renderer) Capture() error {

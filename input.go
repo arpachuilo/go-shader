@@ -4,6 +4,57 @@ import (
 	"github.com/go-gl/glfw/v3.3/glfw"
 )
 
+type KeyCallbackRegistration struct {
+	mods        glfw.ModifierKey
+	action      glfw.Action
+	key         glfw.Key
+	callback    glfw.KeyCallback
+	description string
+}
+
+type KeyCallback struct {
+	callback    glfw.KeyCallback
+	description string
+}
+
+type KeyRegister struct {
+	// TODO: allow multiple callbacks for a key?
+	// TODO: used orderer registration?
+	callbacks map[glfw.Action]map[glfw.Key]map[glfw.ModifierKey]KeyCallback
+}
+
+func (self *KeyRegister) KeyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+	if a, ok := self.callbacks[action]; ok {
+		if b, ok := a[key]; ok {
+			if c, ok := b[mods]; ok {
+				c.callback(w, key, scancode, action, mods)
+			}
+		}
+	}
+}
+
+func NewKeyRegister() *KeyRegister {
+	kr := &KeyRegister{
+		callbacks: make(map[glfw.Action]map[glfw.Key]map[glfw.ModifierKey]KeyCallback),
+	}
+
+	return kr
+}
+
+func (self *KeyRegister) Register(r KeyCallbackRegistration) {
+	if self.callbacks[r.action] == nil {
+		self.callbacks[r.action] = make(map[glfw.Key]map[glfw.ModifierKey]KeyCallback)
+	}
+
+	if self.callbacks[r.action][r.key] == nil {
+		self.callbacks[r.action][r.key] = make(map[glfw.ModifierKey]KeyCallback)
+	}
+
+	self.callbacks[r.action][r.key][r.mods] = KeyCallback{
+		callback: r.callback,
+	}
+}
+
 // KeyPressDetection Allows detection of multiple down-presses at the same time
 type KeyPressDetection struct {
 	// Map of currently pressed keys

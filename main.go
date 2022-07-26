@@ -20,10 +20,11 @@ func init() {
 	runtime.LockOSThread()
 }
 
-// type PluggableRender interface {
-// 	Render(<-chan bool, *glfw.Window)
-// }
 type PluggableRender func(<-chan bool, *glfw.Window)
+
+// TODO: refactor into packages
+// TODO: make registrable keys to print which keys do what
+// TODO: ability to render text overlays
 
 func main() {
 	// init glfw

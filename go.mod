@@ -9,13 +9,14 @@ require (
 )
 
 require (
+	github.com/arpachuilo/go-registrable v0.1.0
+	github.com/fsnotify/fsnotify v1.5.4
 	github.com/gen2brain/beeep v0.0.0-20210529141713-5586760f0cc1
 	github.com/icza/mjpeg v0.0.0-20210726201846-5ff75d3c479f
 	github.com/rjeczalik/notify v0.0.0-20181126183243-629144ba06a1
 )
 
 require (
-	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/go-toast/toast v0.0.0-20190211030409-01e6764cf0a4 // indirect
 	github.com/godbus/dbus/v5 v5.0.6 // indirect
 	github.com/gopherjs/gopherjs v0.0.0-20220104163920-15ed2e8cf2bd // indirect
