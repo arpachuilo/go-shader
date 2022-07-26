@@ -4,8 +4,10 @@ import (
 	"image"
 	"image/color"
 	"log"
+	"plugin"
 	"runtime"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/go-gl/glfw/v3.3/glfw"
 )
 
@@ -17,6 +19,11 @@ func init() {
 	// GLFW event handling must run on the main OS thread
 	runtime.LockOSThread()
 }
+
+// type PluggableRender interface {
+// 	Render(<-chan bool, *glfw.Window)
+// }
+type PluggableRender func(<-chan bool, *glfw.Window)
 
 func main() {
 	// init glfw
@@ -57,18 +64,58 @@ func main() {
 	}
 	window.SetIcon([]image.Image{img})
 
-	renderer := NewRenderer(window)
-	renderer.Setup()
-	renderer.Start()
+	kill := make(chan bool)
+
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		panic(err)
+	}
+	defer watcher.Close()
+
+	watcher.Add("./bin/plugins/")
+
+	// check for updates to plugin
+	latestMod := "./bin/plugins/plug.so"
+	go func() {
+		for {
+			select {
+			case event, ok := <-watcher.Events:
+				if ok {
+					if event.Op == fsnotify.Create {
+						latestMod = event.Name
+						kill <- true
+					}
+				}
+			}
+		}
+	}()
+
+	for {
+		Render(latestMod, kill, window)
+	}
 }
 
-var quadVertices = []float32{
-	// positions   // texCoords
-	-1.0, 1.0, 0.0, 1.0,
-	-1.0, -1.0, 0.0, 0.0,
-	1.0, -1.0, 1.0, 0.0,
+func Render(latestMod string, kill <-chan bool, window *glfw.Window) {
+	// load module
+	// 1. open the so file to load the symbols
+	plug, err := plugin.Open(latestMod)
+	if err != nil {
+		panic(err)
+	}
 
-	-1.0, 1.0, 0.0, 1.0,
-	1.0, -1.0, 1.0, 0.0,
-	1.0, 1.0, 1.0, 1.0,
+	// 2. look up a symbol (an exported function or variable)
+	symRenderer, err := plug.Lookup("PlugRender")
+	if err != nil {
+		panic(err)
+	}
+
+	// 3. Assert that loaded symbol is of a desired type
+	var plugRender PluggableRender
+	plugRender, ok := symRenderer.(func(<-chan bool, *glfw.Window))
+	if !ok {
+		panic("unexpected type from module symbol")
+	}
+
+	// 4. use the module
+	plugRender(kill, window)
 }

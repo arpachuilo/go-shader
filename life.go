@@ -46,8 +46,8 @@ type LifeProgram struct {
 	growthDecayShader Shader
 
 	// output shaders
-	outputShaders CyclicArray[Shader]
-	gradientIndex CyclicArray[int32]
+	outputShaders cyclicArray[Shader]
+	gradientIndex cyclicArray[int32]
 
 	// buffers
 	fbo, vao, vbo uint32
@@ -70,7 +70,7 @@ func NewLifeProgram() Program {
 		cursorSize: 0.025,
 
 		cmds:          cmds,
-		gradientIndex: *NewCyclicArray([]int32{0, 1, 2, 3}),
+		gradientIndex: *newCyclicArray([]int32{0, 1, 2, 3}),
 	}
 }
 
@@ -109,7 +109,7 @@ func (self *LifeProgram) Load(window *glfw.Window, vao, vbo uint32) {
 	self.growthDecayShader = MustCompileShader(assets.VertexShader, assets.GainShader)
 
 	// create output shaders
-	self.outputShaders = *NewCyclicArray([]Shader{
+	self.outputShaders = *newCyclicArray([]Shader{
 		MustCompileShader(assets.VertexShader, assets.ViridisShader),
 		MustCompileShader(assets.VertexShader, assets.InfernoShader),
 		MustCompileShader(assets.VertexShader, assets.MagmaShader),

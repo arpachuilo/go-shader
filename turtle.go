@@ -117,8 +117,8 @@ type TurtleProgram struct {
 	turtleShader Shader
 
 	// output shaders
-	outputShaders CyclicArray[Shader]
-	gradientIndex CyclicArray[int32]
+	outputShaders cyclicArray[Shader]
+	gradientIndex cyclicArray[int32]
 
 	// buffers
 	fbo, vao, vbo uint32
@@ -136,7 +136,7 @@ func NewTurtleProgram() Program {
 		cursorSize: 0.025,
 
 		cmds:          cmds,
-		gradientIndex: *NewCyclicArray([]int32{0, 1, 2, 3}),
+		gradientIndex: *newCyclicArray([]int32{0, 1, 2, 3}),
 	}
 }
 
@@ -169,7 +169,7 @@ func (self *TurtleProgram) Load(window *glfw.Window, vao, vbo uint32) {
 	self.turtleShader = MustCompileShader(assets.VertexShader, assets.TurtleShader)
 
 	// create output shaders
-	self.outputShaders = *NewCyclicArray([]Shader{
+	self.outputShaders = *newCyclicArray([]Shader{
 		MustCompileShader(assets.VertexShader, assets.ViridisShader),
 		MustCompileShader(assets.VertexShader, assets.InfernoShader),
 		MustCompileShader(assets.VertexShader, assets.MagmaShader),
@@ -231,7 +231,7 @@ func (self *TurtleProgram) run(t float64) {
 	pivot1 := int32(distance * self.turtle.Speed)
 	pivot2 := int32(distance*self.turtle.Speed) / 2.0
 	if self.frame%int32(pivot1) == 0 {
-		self.turtle.Turn(140)
+		self.turtle.Turn(90)
 	}
 
 	if self.frame%int32(pivot2) == 0 {
@@ -239,9 +239,9 @@ func (self *TurtleProgram) run(t float64) {
 	}
 
 	w := math.Abs(math.Max(2.0, math.Sin(t)*6))
-	// if self.frame%1 == 0 {
-	// 	self.turtle.PenToggle()
-	// }
+	if self.frame%10 == 0 {
+		// self.turtle.PenToggle()
+	}
 
 	self.turtleShader.Use().
 		Uniform1i("state", 0).

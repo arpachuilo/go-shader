@@ -13,6 +13,17 @@ import (
 	"github.com/go-gl/glfw/v3.3/glfw"
 )
 
+var quadVertices = []float32{
+	// positions   // texCoords
+	-1.0, 1.0, 0.0, 1.0,
+	-1.0, -1.0, 0.0, 0.0,
+	1.0, -1.0, 1.0, 0.0,
+
+	-1.0, 1.0, 0.0, 1.0,
+	1.0, -1.0, 1.0, 0.0,
+	1.0, 1.0, 1.0, 1.0,
+}
+
 var CaptureCmd = "capture"
 
 // Renderer handles running our programs
@@ -101,11 +112,15 @@ func (self *Renderer) SetTickRate(rr float64) {
 var frames = 0
 var lastTime time.Time
 
-func (self *Renderer) Start() {
+func (self *Renderer) Start(kill <-chan bool) {
 	self.Program = NewTurtleProgram()
+	// self.Program = NewMandelbrotProgram()
 	self.Program.Load(self.Window, self.vao, self.vbo)
 	for !self.Window.ShouldClose() {
 		select {
+		// kill
+		case <-kill:
+			return
 		// capture frame
 		case <-self.Cmds[CaptureCmd]:
 			self.Capture()

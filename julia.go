@@ -28,7 +28,7 @@ type JuliaProgram struct {
 	fractalShader Shader
 
 	// output shaders
-	outputShaders CyclicArray[Shader]
+	outputShaders cyclicArray[Shader]
 
 	mouseDelta *MouseDelta
 
@@ -67,7 +67,7 @@ func (self *JuliaProgram) Load(window *glfw.Window, vao, vbo uint32) {
 	self.fractalShader = MustCompileShader(assets.VertexShader, assets.JuliaShader)
 
 	// create output shaders
-	self.outputShaders = *NewCyclicArray([]Shader{
+	self.outputShaders = *newCyclicArray([]Shader{
 		MustCompileShader(assets.VertexShader, assets.ViridisShader),
 		MustCompileShader(assets.VertexShader, assets.InfernoShader),
 		MustCompileShader(assets.VertexShader, assets.MagmaShader),

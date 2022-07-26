@@ -72,8 +72,8 @@ type SmoothLifeProgram struct {
 
 	// output shaders
 	// outputShader Shader
-	outputShaders CyclicArray[Shader]
-	gradientIndex CyclicArray[int32]
+	outputShaders cyclicArray[Shader]
+	gradientIndex cyclicArray[int32]
 
 	// fontmap
 	fontmap *Fontmap
@@ -94,7 +94,7 @@ func NewSmoothLifeProgram() Program {
 		cursorSize: 0.025,
 
 		cmds:          cmds,
-		gradientIndex: *NewCyclicArray([]int32{0, 1, 2, 3}),
+		gradientIndex: *newCyclicArray([]int32{0, 1, 2, 3}),
 	}
 }
 
@@ -133,7 +133,7 @@ func (self *SmoothLifeProgram) Load(window *glfw.Window, vao, vbo uint32) {
 	self.gaussY = MustCompileShader(assets.VertexShader, assets.GaussYShader)
 
 	// create output shaders
-	self.outputShaders = *NewCyclicArray([]Shader{
+	self.outputShaders = *newCyclicArray([]Shader{
 		MustCompileShader(assets.VertexShader, assets.ViridisShader),
 		MustCompileShader(assets.VertexShader, assets.InfernoShader),
 		MustCompileShader(assets.VertexShader, assets.MagmaShader),

@@ -13,6 +13,7 @@ type MandelbrotProgram struct {
 	Window *glfw.Window
 
 	// state
+	paused     bool
 	iterations int32
 	zoom       float64
 	x, y       float64
@@ -26,7 +27,7 @@ type MandelbrotProgram struct {
 	fractalShader Shader
 
 	// output shaders
-	outputShaders CyclicArray[Shader]
+	outputShaders cyclicArray[Shader]
 
 	mouseDelta *MouseDelta
 
@@ -36,6 +37,7 @@ type MandelbrotProgram struct {
 
 func NewMandelbrotProgram() Program {
 	return &MandelbrotProgram{
+		paused:     false,
 		iterations: 1000,
 		x:          -0.51,
 		y:          0.0,
@@ -62,7 +64,7 @@ func (self *MandelbrotProgram) Load(window *glfw.Window, vao, vbo uint32) {
 	self.fractalShader = MustCompileShader(assets.VertexShader, assets.MandelbrotShader)
 
 	// create output shaders
-	self.outputShaders = *NewCyclicArray([]Shader{
+	self.outputShaders = *newCyclicArray([]Shader{
 		MustCompileShader(assets.VertexShader, assets.ViridisShader),
 		MustCompileShader(assets.VertexShader, assets.InfernoShader),
 		MustCompileShader(assets.VertexShader, assets.MagmaShader),
@@ -82,6 +84,10 @@ func (self *MandelbrotProgram) Load(window *glfw.Window, vao, vbo uint32) {
 }
 
 func (self *MandelbrotProgram) Render(t float64) {
+	if self.paused {
+		return
+	}
+
 	width, height := self.Window.GetSize()
 	sy, sx := self.Window.GetContentScale()
 	gl.Viewport(
@@ -144,6 +150,10 @@ func (self *MandelbrotProgram) ScrollCallback(w *glfw.Window, xoff float64, yoff
 }
 
 func (self *MandelbrotProgram) KeyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+	if key == glfw.KeySpace && action == glfw.Release {
+		self.paused = !self.paused
+	}
+
 	if key == glfw.KeyEqual {
 		self.iterations = self.iterations + 10
 	}
