@@ -4,6 +4,7 @@ import (
 	"image"
 	"image/color"
 	"math"
+	"math/rand"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
@@ -20,22 +21,25 @@ type Pong struct {
 	Height int
 }
 
+// TODO: Look into storing this inside texture for use with sampler
 func NewPong() *Pong {
 	return &Pong{
 		Position: Vector2{
-			X: 0,
-			Y: 0,
+			X: rand.Float64(),
+			Y: rand.Float64(),
 		},
 		Heading: Vector2{
-			X: 0.5,
-			Y: 0.3,
+			X: -1.0 + rand.Float64()*2,
+			Y: -1.0 + rand.Float64()*2,
 		}.Normalize(),
 		Speed: 5,
-		Size:  42,
+		Size:  float64(rand.Intn(12) + 3),
 	}
 }
 
 func (self *Pong) Resize(width, height int) {
+	self.Position.X = rand.Float64() * float64(width)
+	self.Position.Y = rand.Float64() * float64(height)
 	self.Width = width
 	self.Height = height
 }
@@ -45,7 +49,7 @@ func (self *Pong) Turn(degrees float64) Vector2 {
 	return self.Heading
 }
 
-func (self *Pong) Advance() Vector2 {
+func (self *Pong) Advance() {
 	next := self.Position.Add(self.Heading.Mul(self.Speed))
 
 	if next.X <= 0.0 {
@@ -63,13 +67,12 @@ func (self *Pong) Advance() Vector2 {
 	}
 
 	self.Position = next
-	return self.Position
 }
 
 type PongProgram struct {
 	Window *glfw.Window
 
-	pong *Pong
+	pong []*Pong
 
 	// state
 	frame      int32
@@ -95,8 +98,13 @@ func NewPongProgram() Program {
 	cmds := NewCmdChannels()
 	cmds.Register(RecolorCmd)
 
+	pongs := make([]*Pong, 0)
+	for i := 0; i < 12; i++ {
+		pongs = append(pongs, NewPong())
+	}
+
 	return &PongProgram{
-		pong: NewPong(),
+		pong: pongs,
 
 		frame:      0,
 		paused:     false,
@@ -156,11 +164,13 @@ func (self *PongProgram) Load(window *glfw.Window, vao, vbo uint32) {
 
 	// load turtle
 	// center of screen
-	distance := math.Min(float64(width), float64(height)) * 0.25
-	x := (float64(width) / 2.0)
-	y := (float64(height) / 2.0) + (distance / 4.0)
-	self.pong.Position = Vector2{x, y}
-	self.pong.Resize(width, height)
+	// distance := math.Min(float64(width), float64(height)) * 0.25
+	// x := (float64(width) / 2.0)
+	// y := (float64(height) / 2.0) + (distance / 4.0)
+
+	for _, p := range self.pong {
+		p.Resize(width, height)
+	}
 }
 
 func (self *PongProgram) recolor() {
@@ -188,13 +198,24 @@ func (self *PongProgram) run(t float64) {
 	gl.BindVertexArray(self.vao)
 	self.tex.Activate(gl.TEXTURE0)
 
-	next := self.pong.Advance()
+	for _, p := range self.pong {
+		p.Advance()
+	}
+
+	sizes := make([]float32, 0)
+	pongs := make([]float32, 0)
+	for _, p := range self.pong {
+		sizes = append(sizes, float32(p.Size))
+		pongs = append(pongs, float32(p.Position.X))
+		pongs = append(pongs, float32(p.Position.Y))
+	}
 
 	self.pongShader.Use().
 		Uniform1i("state", 0).
 		Uniform1f("time", float32(t)).
-		Uniform1f("size", float32(self.pong.Size)).
-		Uniform2f("b", float32(next.X), float32(next.Y)).
+		Uniform2fv("particles", pongs).
+		Uniform1fv("particleSizes", sizes).
+		Uniform1i("len", int32(len(self.pong))).
 		Uniform2f("scale", float32(width), float32(height)).
 		Uniform2f("mouse", float32(mx), float32(height)-float32(my))
 	gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
@@ -236,7 +257,10 @@ func (self *PongProgram) ScrollCallback(w *glfw.Window, xoff float64, yoff float
 
 func (self *PongProgram) ResizeCallback(w *glfw.Window, width int, height int) {
 	self.tex.Resize(width, height)
-	self.pong.Resize(width, height)
+
+	for _, p := range self.pong {
+		p.Resize(width, height)
+	}
 }
 
 func (self *PongProgram) KeyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
