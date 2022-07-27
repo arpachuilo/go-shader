@@ -9,59 +9,67 @@ import (
 	"github.com/go-gl/glfw/v3.3/glfw"
 )
 
-type Turtle struct {
-	Down     int32
+type Pong struct {
 	Heading  Vector2
 	Position Vector2
-	Speed    float64
+
+	Speed float64
+	Size  float64
+
+	Width  int
+	Height int
 }
 
-func NewTurtle() *Turtle {
-	return &Turtle{
-		Down: 1,
+func NewPong() *Pong {
+	return &Pong{
 		Position: Vector2{
 			X: 0,
 			Y: 0,
 		},
 		Heading: Vector2{
-			X: 0,
-			Y: -1,
-		},
-		Speed: 1,
+			X: 0.5,
+			Y: 0.3,
+		}.Normalize(),
+		Speed: 5,
+		Size:  42,
 	}
 }
 
-func (self *Turtle) PenToggle() {
-	if self.Down == 1 {
-		self.Down = 0
-	} else {
-		self.Down = 1
-	}
+func (self *Pong) Resize(width, height int) {
+	self.Width = width
+	self.Height = height
 }
 
-func (self *Turtle) PenUp() {
-	self.Down = 1
-}
-
-func (self *Turtle) PenDown() {
-	self.Down = 0
-}
-
-func (self *Turtle) Turn(degrees float64) Vector2 {
+func (self *Pong) Turn(degrees float64) Vector2 {
 	self.Heading = self.Heading.Turn(degrees)
 	return self.Heading
 }
 
-func (self *Turtle) Advance() (Vector2, Vector2) {
-	previous := self.Position
-	self.Position = previous.Add(self.Heading.Mul(self.Speed))
-	return previous, self.Position
+func (self *Pong) Advance() Vector2 {
+	next := self.Position.Add(self.Heading.Mul(self.Speed))
+
+	if next.X <= 0.0 {
+		self.Heading = self.Heading.Reflect(Vector3Right).Normalize()
+		next = self.Position.Add(self.Heading.Mul(self.Speed))
+	} else if next.X >= float64(self.Width) {
+		self.Heading = self.Heading.Reflect(Vector3Left).Normalize()
+		next = self.Position.Add(self.Heading.Mul(self.Speed))
+	} else if next.Y <= 0.0 {
+		self.Heading = self.Heading.Reflect(Vector3Up).Normalize()
+		next = self.Position.Add(self.Heading.Mul(self.Speed))
+	} else if next.Y >= float64(self.Height) {
+		self.Heading = self.Heading.Reflect(Vector3Down).Normalize()
+		next = self.Position.Add(self.Heading.Mul(self.Speed))
+	}
+
+	self.Position = next
+	return self.Position
 }
 
-type TurtleProgram struct {
+type PongProgram struct {
 	Window *glfw.Window
 
-	turtle *Turtle
+	pong *Pong
 
 	// state
 	frame      int32
@@ -73,7 +81,7 @@ type TurtleProgram struct {
 	tex *Texture
 
 	// compute shaders
-	turtleShader Shader
+	pongShader Shader
 
 	// output shaders
 	outputShaders cyclicArray[Shader]
@@ -83,12 +91,12 @@ type TurtleProgram struct {
 	fbo, vao, vbo uint32
 }
 
-func NewTurtleProgram() Program {
+func NewPongProgram() Program {
 	cmds := NewCmdChannels()
 	cmds.Register(RecolorCmd)
 
-	return &TurtleProgram{
-		turtle: NewTurtle(),
+	return &PongProgram{
+		pong: NewPong(),
 
 		frame:      0,
 		paused:     false,
@@ -99,7 +107,7 @@ func NewTurtleProgram() Program {
 	}
 }
 
-func (self *TurtleProgram) Load(window *glfw.Window, vao, vbo uint32) {
+func (self *PongProgram) Load(window *glfw.Window, vao, vbo uint32) {
 	self.Window = window
 	self.vao = vao
 	self.vbo = vbo
@@ -125,7 +133,7 @@ func (self *TurtleProgram) Load(window *glfw.Window, vao, vbo uint32) {
 	self.tex = LoadTexture(&prev)
 
 	// create compute shaders
-	self.turtleShader = MustCompileShader(VertexShader, TurtleShader)
+	self.pongShader = MustCompileShader(VertexShader, PongShader)
 
 	// create output shaders
 	self.outputShaders = *newCyclicArray([]Shader{
@@ -151,11 +159,11 @@ func (self *TurtleProgram) Load(window *glfw.Window, vao, vbo uint32) {
 	distance := math.Min(float64(width), float64(height)) * 0.25
 	x := (float64(width) / 2.0)
 	y := (float64(height) / 2.0) + (distance / 4.0)
-	self.turtle.Position = Vector2{x, y}
-	self.turtle.Turn(100)
+	self.pong.Position = Vector2{x, y}
+	self.pong.Resize(width, height)
 }
 
-func (self *TurtleProgram) recolor() {
+func (self *PongProgram) recolor() {
 	width, height := self.Window.GetSize()
 
 	// use copy program
@@ -170,45 +178,23 @@ func (self *TurtleProgram) recolor() {
 	gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
 }
 
-func (self *TurtleProgram) run(t float64) {
+func (self *PongProgram) run(t float64) {
 	width, height := self.Window.GetSize()
 	mx, my := self.Window.GetCursorPos()
 
-	// use gol program
 	gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
 	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, self.tex.Handle, 0)
 
 	gl.BindVertexArray(self.vao)
 	self.tex.Activate(gl.TEXTURE0)
 
-	// prev, next := self.turtle.Dot()
-	prev, next := self.turtle.Advance()
+	next := self.pong.Advance()
 
-	// travel 1/12 min(width, height) before turning
-	// uses refresh rate of 60 (make this dynamic later)
-	distance := math.Min(float64(width), float64(height)) * 0.15
-	pivot1 := int32(distance * self.turtle.Speed)
-	pivot2 := int32(distance*self.turtle.Speed) / 2.0
-	if self.frame%int32(pivot1) == 0 {
-		self.turtle.Turn(90)
-	}
-
-	if self.frame%int32(pivot2) == 0 {
-		self.turtle.Turn(100)
-	}
-
-	w := math.Abs(math.Max(2.0, math.Sin(t)*6))
-	if self.frame%10 == 0 {
-		// self.turtle.PenToggle()
-	}
-
-	self.turtleShader.Use().
+	self.pongShader.Use().
 		Uniform1i("state", 0).
-		Uniform1i("d", self.turtle.Down).
-		Uniform1f("w", float32(w)).
-		Uniform2f("a", float32(prev.X), float32(prev.Y)).
-		Uniform2f("b", float32(next.X), float32(next.Y)).
 		Uniform1f("time", float32(t)).
+		Uniform1f("size", float32(self.pong.Size)).
+		Uniform2f("b", float32(next.X), float32(next.Y)).
 		Uniform2f("scale", float32(width), float32(height)).
 		Uniform2f("mouse", float32(mx), float32(height)-float32(my))
 	gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
@@ -225,7 +211,7 @@ func (self *TurtleProgram) run(t float64) {
 	gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
 }
 
-func (self *TurtleProgram) Render(t float64) {
+func (self *PongProgram) Render(t float64) {
 	select {
 	case <-self.cmds[RecolorCmd]:
 		self.recolor()
@@ -240,7 +226,7 @@ func (self *TurtleProgram) Render(t float64) {
 	}
 }
 
-func (self *TurtleProgram) ScrollCallback(w *glfw.Window, xoff float64, yoff float64) {
+func (self *PongProgram) ScrollCallback(w *glfw.Window, xoff float64, yoff float64) {
 	if yoff > 0 {
 		self.cursorSize = math.Max(0, self.cursorSize-0.005)
 	} else if yoff < 0 {
@@ -248,11 +234,12 @@ func (self *TurtleProgram) ScrollCallback(w *glfw.Window, xoff float64, yoff flo
 	}
 }
 
-func (self *TurtleProgram) ResizeCallback(w *glfw.Window, width int, height int) {
+func (self *PongProgram) ResizeCallback(w *glfw.Window, width int, height int) {
 	self.tex.Resize(width, height)
+	self.pong.Resize(width, height)
 }
 
-func (self *TurtleProgram) KeyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+func (self *PongProgram) KeyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 	if action == glfw.Release {
 		if key == glfw.KeyJ {
 			self.outputShaders.Previous()

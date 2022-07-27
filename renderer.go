@@ -121,8 +121,8 @@ var frames = 0
 var lastTime time.Time
 
 func (self *Renderer) Start(kill <-chan bool) {
-	self.Program = NewTurtleProgram()
-	// self.Program = NewMandelbrotProgram()
+	// self.Program = NewTurtleProgram()
+	self.Program = NewPongProgram()
 	self.Program.Load(self.Window, self.vao, self.vbo)
 	for !self.Window.ShouldClose() {
 		select {
@@ -217,6 +217,17 @@ func (self *Renderer) SwitchToTurtle() registrable.Registration {
 		key:    glfw.KeyF5,
 		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 			self.Program = NewTurtleProgram()
+			self.Program.Load(self.Window, self.vao, self.vbo)
+		},
+	}
+}
+
+func (self *Renderer) SwitchToPong() registrable.Registration {
+	return KeyCallbackRegistration{
+		action: glfw.Release,
+		key:    glfw.KeyF6,
+		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+			self.Program = NewPongProgram()
 			self.Program.Load(self.Window, self.vao, self.vbo)
 		},
 	}

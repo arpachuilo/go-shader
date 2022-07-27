@@ -5,8 +5,6 @@ import (
 
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
-
-	"go-trip/assets"
 )
 
 type JuliaProgram struct {
@@ -64,18 +62,18 @@ func (self *JuliaProgram) Load(window *glfw.Window, vao, vbo uint32) {
 	self.fractalTexture = LoadTexture(&img)
 
 	// create compute shaders
-	self.fractalShader = MustCompileShader(assets.VertexShader, assets.JuliaShader)
+	self.fractalShader = MustCompileShader(VertexShader, JuliaShader)
 
 	// create output shaders
 	self.outputShaders = *newCyclicArray([]Shader{
-		MustCompileShader(assets.VertexShader, assets.ViridisShader),
-		MustCompileShader(assets.VertexShader, assets.InfernoShader),
-		MustCompileShader(assets.VertexShader, assets.MagmaShader),
-		MustCompileShader(assets.VertexShader, assets.PlasmaShader),
-		MustCompileShader(assets.VertexShader, assets.CividisShader),
-		MustCompileShader(assets.VertexShader, assets.TurboShader),
-		MustCompileShader(assets.VertexShader, assets.SinebowShader),
-		MustCompileShader(assets.VertexShader, assets.RGBShader),
+		MustCompileShader(VertexShader, ViridisShader),
+		MustCompileShader(VertexShader, InfernoShader),
+		MustCompileShader(VertexShader, MagmaShader),
+		MustCompileShader(VertexShader, PlasmaShader),
+		MustCompileShader(VertexShader, CividisShader),
+		MustCompileShader(VertexShader, TurboShader),
+		MustCompileShader(VertexShader, SinebowShader),
+		MustCompileShader(VertexShader, RGBShader),
 	})
 
 	// create framebuffers

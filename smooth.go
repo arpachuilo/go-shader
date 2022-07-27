@@ -8,8 +8,6 @@ import (
 
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
-
-	"go-trip/assets"
 )
 
 type SmoothLifeRules struct {
@@ -128,21 +126,21 @@ func (self *SmoothLifeProgram) Load(window *glfw.Window, vao, vbo uint32) {
 	self.textureC = LoadTexture(&img3)
 
 	// create compute shaders
-	self.smoothShader = MustCompileShader(assets.VertexShader, assets.SmoothShader)
-	self.gaussX = MustCompileShader(assets.VertexShader, assets.GaussXShader)
-	self.gaussY = MustCompileShader(assets.VertexShader, assets.GaussYShader)
+	self.smoothShader = MustCompileShader(VertexShader, SmoothShader)
+	self.gaussX = MustCompileShader(VertexShader, GaussXShader)
+	self.gaussY = MustCompileShader(VertexShader, GaussYShader)
 
 	// create output shaders
 	self.outputShaders = *newCyclicArray([]Shader{
-		MustCompileShader(assets.VertexShader, assets.ViridisShader),
-		MustCompileShader(assets.VertexShader, assets.InfernoShader),
-		MustCompileShader(assets.VertexShader, assets.MagmaShader),
-		MustCompileShader(assets.VertexShader, assets.PlasmaShader),
-		MustCompileShader(assets.VertexShader, assets.CividisShader),
-		MustCompileShader(assets.VertexShader, assets.TurboShader),
-		MustCompileShader(assets.VertexShader, assets.SinebowShader),
-		MustCompileShader(assets.VertexShader, assets.RGBShader),
-		MustCompileShader(assets.VertexShader, assets.RGBAShader),
+		MustCompileShader(VertexShader, ViridisShader),
+		MustCompileShader(VertexShader, InfernoShader),
+		MustCompileShader(VertexShader, MagmaShader),
+		MustCompileShader(VertexShader, PlasmaShader),
+		MustCompileShader(VertexShader, CividisShader),
+		MustCompileShader(VertexShader, TurboShader),
+		MustCompileShader(VertexShader, SinebowShader),
+		MustCompileShader(VertexShader, RGBShader),
+		MustCompileShader(VertexShader, RGBAShader),
 	})
 
 	self.fontmap = MustLoadFont(self.vbo, self.vao)

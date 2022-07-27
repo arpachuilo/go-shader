@@ -1,4 +1,4 @@
-module go-trip
+module go-shaders
 
 go 1.18
 

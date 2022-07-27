@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"log"
@@ -22,9 +23,12 @@ func init() {
 
 type PluggableRender func(<-chan bool, *glfw.Window)
 
+var lastWorkingMod string = "./bin/plugins/plug.so"
+
 // TODO: refactor into packages
 // TODO: make registrable keys to print which keys do what
 // TODO: ability to render text overlays
+// TODO: command to generate embedded asset listings
 
 func main() {
 	// init glfw
@@ -91,32 +95,47 @@ func main() {
 		}
 	}()
 
-	for {
-		Render(latestMod, kill, window)
+	for !window.ShouldClose() {
+		err := Render(latestMod, kill, window)
+		if err != nil {
+			latestMod = lastWorkingMod
+			fmt.Println(err)
+		}
 	}
 }
 
-func Render(latestMod string, kill <-chan bool, window *glfw.Window) {
+func Render(latestMod string, kill <-chan bool, window *glfw.Window) (err error) {
 	// load module
 	// 1. open the so file to load the symbols
 	plug, err := plugin.Open(latestMod)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	// 2. look up a symbol (an exported function or variable)
 	symRenderer, err := plug.Lookup("PlugRender")
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	// 3. Assert that loaded symbol is of a desired type
 	var plugRender PluggableRender
 	plugRender, ok := symRenderer.(func(<-chan bool, *glfw.Window))
 	if !ok {
-		panic("unexpected type from module symbol")
+		return err
 	}
 
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("recovered: %v", r)
+		} else {
+			lastWorkingMod = latestMod
+		}
+	}()
+
 	// 4. use the module
+	fmt.Printf("Running Plug: %v\n", latestMod)
 	plugRender(kill, window)
+
+	return nil
 }

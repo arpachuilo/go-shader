@@ -8,8 +8,6 @@ import (
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
 	"github.com/rjeczalik/notify"
-
-	"go-trip/assets"
 )
 
 type LiveEditProgram struct {
@@ -90,13 +88,13 @@ func (self *LiveEditProgram) Load(window *glfw.Window, vao, vbo uint32) {
 	img := *image.NewRGBA(image.Rect(0, 0, width, height))
 	self.texture = LoadTexture(&img)
 
-	self.shader = MustCompileShader(assets.VertexShader, assets.FragShader)
+	self.shader = MustCompileShader(VertexShader, FragShader)
 
 	go self.watch()
 }
 
 func (self *LiveEditProgram) compile(code string) {
-	newShader, err := CompileShader(assets.VertexShader, code)
+	newShader, err := CompileShader(VertexShader, code)
 	if err != nil {
 		log.Println("error", err)
 		return
