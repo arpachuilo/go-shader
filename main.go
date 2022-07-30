@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"io"
 	"log"
+	"os"
 	"plugin"
 	"runtime"
 
@@ -23,7 +25,8 @@ func init() {
 
 type PluggableRender func(<-chan bool, *glfw.Window)
 
-var lastWorkingMod string = "./bin/plugins/plug.so"
+var pluginPath string = "./bin/plugins/"
+var lastWorkingMod string = pluginPath + "plug.so"
 
 // TODO: refactor into packages
 // TODO: make registrable keys to print which keys do what
@@ -43,20 +46,24 @@ func main() {
 	glfw.WindowHint(glfw.ContextVersionMinor, 1)
 	glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile)
 	glfw.WindowHint(glfw.OpenGLForwardCompatible, glfw.True)
+	glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile)
 
 	// basic
 	glfw.WindowHint(glfw.Resizable, glfw.True)
 	glfw.WindowHint(glfw.CenterCursor, glfw.True)
+	glfw.WindowHint(glfw.TransparentFramebuffer, glfw.True)
 
-	// mac os
-	glfw.WindowHint(glfw.CocoaRetinaFramebuffer, glfw.True)
-	glfw.WindowHintString(glfw.CocoaFrameNAME, "go-opengl")
+	// setup os specific hints
+	SetupOSHint()
 
 	window, err := glfw.CreateWindow(windowWidth, windowHeight, "Visuals", nil, nil)
 	if err != nil {
 		panic(err)
 	}
 	window.MakeContextCurrent()
+
+	// setup os specific window
+	SetupOSWindow(window, true)
 
 	// disable cursor
 	window.SetInputMode(glfw.CursorMode, glfw.CursorDisabled)
@@ -77,10 +84,10 @@ func main() {
 	}
 	defer watcher.Close()
 
-	watcher.Add("./bin/plugins/")
+	watcher.Add(pluginPath)
 
 	// check for updates to plugin
-	latestMod := "./bin/plugins/plug.so"
+	latestMod := lastWorkingMod
 	go func() {
 		for {
 			select {
@@ -95,13 +102,65 @@ func main() {
 		}
 	}()
 
+	successiveFails := 0
 	for !window.ShouldClose() {
 		err := Render(latestMod, kill, window)
 		if err != nil {
+			successiveFails++
 			latestMod = lastWorkingMod
 			fmt.Println(err)
+		} else {
+			successiveFails = 0
+		}
+
+		if successiveFails > 3 {
+			window.SetShouldClose(true)
 		}
 	}
+}
+
+func copy(src, dst string, BUFFERSIZE int64) error {
+	sourceFileStat, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+
+	if !sourceFileStat.Mode().IsRegular() {
+		return fmt.Errorf("%s is not a regular file.", src)
+	}
+
+	source, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+
+	destination, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destination.Close()
+
+	if err != nil {
+		panic(err)
+	}
+
+	buf := make([]byte, BUFFERSIZE)
+	for {
+		n, err := source.Read(buf)
+		if err != nil && err != io.EOF {
+			return err
+		}
+		if n == 0 {
+			break
+		}
+
+		if _, err := destination.Write(buf[:n]); err != nil {
+			return err
+		}
+	}
+
+	return err
 }
 
 func Render(latestMod string, kill <-chan bool, window *glfw.Window) (err error) {
@@ -130,6 +189,9 @@ func Render(latestMod string, kill <-chan bool, window *glfw.Window) (err error)
 			err = fmt.Errorf("recovered: %v", r)
 		} else {
 			lastWorkingMod = latestMod
+
+			// overwrite existing plugin.so with new valid one
+			// err = copy(latestMod, pluginPath+"plug.so", 1024)
 		}
 	}()
 
