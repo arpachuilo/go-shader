@@ -2,6 +2,7 @@
 uniform int index;
 uniform sampler2D state;
 uniform vec2 scale;
+uniform float alpha;
 
 const float pi = 3.141592653589793238462643383;
 const float pi1_3 = pi / 3;
@@ -24,5 +25,5 @@ out vec4 outputColor;
 void main() {
     vec4 tex = texture(state, fragTexCoord.xy);
     vec4 color = vec4(sinebow(tex[index]), 1.0);
-    outputColor = vec4(color.rgb, 1.0);
+    outputColor = vec4(color.rgb, 1.0 - color.a * alpha);
 }

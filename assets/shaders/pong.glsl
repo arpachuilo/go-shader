@@ -30,5 +30,6 @@ void main() {
   }
   
   // decay previous areas
-  outputColor = uv() - 0.01;
+  vec4 oc = uv();
+  outputColor = vec4(oc.rgb - 0.01, step(0.1, oc.r));
 }

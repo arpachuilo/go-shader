@@ -221,15 +221,18 @@ void main() {
   float speed = u_time * 0.5;
 
   // movement along x
-  // float x = st.x; // none
+  float x = st.x; // none
   // float x = sin(speed + st.x * PI * 2) / 2 - 0.5; // focus center
-  float x = sin(speed + st.x*PI); // full
+  // float x = sin(speed + st.x*PI); // full
 
   // movement of exp
-  // float e = 1; // linear
-  float e = map(sin(2*speed), -1.0, 1.0, 0.5, 3.5); // move exp
+  float e = 1; // linear
+  // float e = map(sin(2*speed), -1.0, 1.0, 0.5, 3.5); // move exp
 
   // movement along 01
+  // float zo = 2;
+  // float zoo = 3;
+  // float zoo = 3;
   float zo = map(sin(speed), -1.0, 1.0, 0.0, 1.0);
   float zoo = map(cos(2.0*speed), -1.0, 1.0, 0.0, 1.0);
   float nzoo = map(cos(2.0*speed), -1.0, 1.0, 0.001, 1.0);
@@ -360,5 +363,5 @@ void main() {
     color, vec3(1.0, 0.2, 0.7)
   );
 
-	outputColor = vec4(color, 1.0);
+	outputColor = vec4(color, 0.6);
 }

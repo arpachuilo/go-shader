@@ -2,6 +2,8 @@
 uniform int index;
 uniform sampler2D state;
 uniform vec2 scale;
+uniform float alpha;
+
 
 vec3 turbo(float x) {
   float r = 0.1357 + x * ( 4.5974 - x * ( 42.3277 - x * ( 130.5887 - x * ( 150.5666 - x * 58.1375 ))));
@@ -17,5 +19,5 @@ out vec4 outputColor;
 void main() {
   vec4 tex = texture(state, fragTexCoord.xy);
   vec4 color = vec4(turbo(tex[index]), 1.0);
-  outputColor = vec4(color.rgb, 1.0);
+  outputColor = vec4(color.rgb, 1.0 - color.a * alpha);
 }

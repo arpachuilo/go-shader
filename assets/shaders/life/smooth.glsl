@@ -63,12 +63,12 @@ void main() {
     float new = clamp(current.x + dt * delta, 0.0, 1.0);
     
     float mouse_distance = length(gl_FragCoord.xy - mouse.xy);
-    if (mouse.z > 0.0) {
+    // if (mouse.z > 0.0) {
         // from chronos' SmoothLife shader https://www.shadertoy.com/view/XtdSDn
         if (mouse_distance <= or) {
         	new = step((ir+1.5), mouse_distance) * (1.0 - step(or, mouse_distance));
         }
-    }
+    // }
     
     outputColor = vec4(new, fullness, current.w);
 }

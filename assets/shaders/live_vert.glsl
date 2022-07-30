@@ -21,8 +21,8 @@ void main() {
   float rnd = random(st) * 10;
 
   vec2 tt = vertTexCoord;
-  tt.x += sin(rnd) * 1.0;
-  tt.x = fract(tt.x);
+  tt.x += sin(u_time) * 1.0;
+  // tt.x = fract(tt.x);
   // tt.y += cos(u_time + rnd) * 10;
   // gl_Position = vec4(tt, 0, 1);
   fragTexCoord = tt;

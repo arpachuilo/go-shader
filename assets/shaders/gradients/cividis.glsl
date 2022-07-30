@@ -2,6 +2,7 @@
 uniform int index;
 uniform sampler2D state;
 uniform vec2 scale;
+uniform float alpha;
 
 vec3 cividis(float t) {
     float r = round(-4.54 - t*(35.34-t*(2381.73-t*(6402.7-t*(7024.72-t*2710.57)))));
@@ -22,5 +23,5 @@ out vec4 outputColor;
 void main() {
     vec4 tex = texture(state, fragTexCoord.xy);
     vec4 color = vec4(cividis(tex[index]), 1.0);
-    outputColor = vec4(color.rgb, 1.0);
+    outputColor = vec4(color.rgb, 1.0 - color.a * alpha);
 }
