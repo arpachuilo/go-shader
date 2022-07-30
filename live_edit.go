@@ -122,7 +122,7 @@ func (self *LiveEditProgram) run(t float64) {
 		Uniform1f("u_time", float32(t)).
 		Uniform2f("u_mouse", float32(mx), float32(self.height)-float32(my)).
 		Uniform2f("u_resolution", float32(self.width), float32(self.height))
-	gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
+	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
 }
 
 func (self *LiveEditProgram) Render(t float64) {
@@ -163,7 +163,7 @@ func (self *LiveEditProgram) Render(t float64) {
 		}
 	default:
 		if self.paused {
-			gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
+			gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
 			return
 		}
 

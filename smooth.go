@@ -163,7 +163,7 @@ func (self *SmoothLifeProgram) recolor() {
 		Uniform1i("index", *self.gradientIndex.Current()).
 		Uniform1i("state", 0).
 		Uniform2f("scale", float32(width), float32(height))
-	gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
+	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
 }
 
 func (self *SmoothLifeProgram) smooth(t float64) {
@@ -189,7 +189,7 @@ func (self *SmoothLifeProgram) smooth(t float64) {
 		Uniform1f("time", float32(t)).
 		Uniform2f("scale", float32(width), float32(height)).
 		Uniform4f("mouse", float32(mx), float32(height)-float32(my), float32(mb1), float32(mb2))
-	gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
+	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
 
 	// use gauss x
 	gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
@@ -206,7 +206,7 @@ func (self *SmoothLifeProgram) smooth(t float64) {
 		Uniform1f("time", float32(t)).
 		Uniform2f("scale", float32(width), float32(height)).
 		Uniform2f("mouse", float32(mx), float32(height)-float32(my))
-	gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
+	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
 
 	// use gauss y
 	gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
@@ -223,7 +223,7 @@ func (self *SmoothLifeProgram) smooth(t float64) {
 		Uniform1f("time", float32(t)).
 		Uniform2f("scale", float32(width), float32(height)).
 		Uniform2f("mouse", float32(mx), float32(height)-float32(my))
-	gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
+	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
 
 	// use copy program
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
@@ -234,7 +234,7 @@ func (self *SmoothLifeProgram) smooth(t float64) {
 		Uniform1i("index", *self.gradientIndex.Current()).
 		Uniform1i("state", 0).
 		Uniform2f("scale", float32(width), float32(height))
-	gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
+	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
 }
 
 func (self *SmoothLifeProgram) Render(t float64) {
@@ -243,7 +243,7 @@ func (self *SmoothLifeProgram) Render(t float64) {
 		self.recolor()
 	default:
 		if self.paused {
-			gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
+			gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
 			return
 		}
 

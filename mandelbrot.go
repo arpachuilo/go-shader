@@ -71,6 +71,7 @@ func (self *MandelbrotProgram) Load(window *glfw.Window, vao, vbo uint32) {
 		MustCompileShader(VertexShader, TurboShader),
 		MustCompileShader(VertexShader, SinebowShader),
 		MustCompileShader(VertexShader, RGBShader),
+		MustCompileShader(VertexShader, RGBAShader),
 	})
 
 	// create framebuffers
@@ -99,7 +100,7 @@ func (self *MandelbrotProgram) Render(t float64) {
 		Uniform2f("focus", float32(self.x), float32(self.y)).
 		Uniform1f("zoom", float32(self.zoom)).
 		Uniform2f("scale", float32(width), float32(height))
-	gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
+	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
 
 	// use copy program
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
@@ -110,7 +111,7 @@ func (self *MandelbrotProgram) Render(t float64) {
 		Uniform1i("index", 0).
 		Uniform1i("state", 0).
 		Uniform2f("scale", float32(width), float32(height))
-	gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
+	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
 }
 
 func (self *MandelbrotProgram) ZoomOut() {

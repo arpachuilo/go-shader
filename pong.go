@@ -75,10 +75,10 @@ type PongProgram struct {
 	pong []*Pong
 
 	// state
-	frame      int32
-	paused     bool
-	cursorSize float64
-	cmds       CmdChannels
+	frame  int32
+	paused bool
+	alpha  float64
+	cmds   CmdChannels
 
 	// textures
 	tex *Texture
@@ -106,9 +106,9 @@ func NewPongProgram() Program {
 	return &PongProgram{
 		pong: pongs,
 
-		frame:      0,
-		paused:     false,
-		cursorSize: 0.025,
+		frame:  0,
+		paused: false,
+		alpha:  0.0,
 
 		cmds:          cmds,
 		gradientIndex: *newCyclicArray([]int32{0, 1, 2, 3}),
@@ -179,7 +179,7 @@ func (self *PongProgram) recolor() {
 		Uniform1i("index", *self.gradientIndex.Current()).
 		Uniform1i("state", 0).
 		Uniform2f("scale", float32(width), float32(height))
-	gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
+	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
 }
 
 func (self *PongProgram) run(t float64) {
@@ -212,7 +212,7 @@ func (self *PongProgram) run(t float64) {
 		Uniform1f("iTime", float32(t)).
 		Uniform2f("iResolution", float32(width), float32(height)).
 		Uniform2f("iMouse", float32(mx), float32(height)-float32(my))
-	gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
+	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
 
 	// use copy program
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
@@ -221,9 +221,10 @@ func (self *PongProgram) run(t float64) {
 
 	self.outputShaders.Current().Use().
 		Uniform1i("index", *self.gradientIndex.Current()).
+		Uniform1f("alpha", float32(self.alpha)).
 		Uniform1i("state", 0).
 		Uniform2f("scale", float32(width), float32(height))
-	gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
+	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
 }
 
 func (self *PongProgram) Render(t float64) {
@@ -232,7 +233,7 @@ func (self *PongProgram) Render(t float64) {
 		self.recolor()
 	default:
 		if self.paused {
-			gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
+			gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
 			return
 		}
 
@@ -243,9 +244,9 @@ func (self *PongProgram) Render(t float64) {
 
 func (self *PongProgram) ScrollCallback(w *glfw.Window, xoff float64, yoff float64) {
 	if yoff > 0 {
-		self.cursorSize = math.Max(0, self.cursorSize-0.005)
+		self.alpha = math.Max(0, self.alpha-0.005)
 	} else if yoff < 0 {
-		self.cursorSize = math.Min(1, self.cursorSize+0.005)
+		self.alpha = math.Min(1, self.alpha+0.005)
 	}
 }
 

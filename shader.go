@@ -21,6 +21,7 @@ func MustCompileShader(vertexShaderSource, fragmentShaderSource string) Shader {
 }
 
 // CompileShader create a new shader program.
+// TODO: stop hard coding to the quad
 func CompileShader(vertexShaderSource, fragmentShaderSource string) (Shader, error) {
 	vertexShader, err := compileShader(vertexShaderSource+"\x00", gl.VERTEX_SHADER)
 	if err != nil {
@@ -65,9 +66,9 @@ func CompileShader(vertexShaderSource, fragmentShaderSource string) (Shader, err
 	gl.VertexAttribPointerWithOffset(vertCoords, 2, gl.FLOAT, false, 4*4, 0)
 
 	// bind texture coordinates
-	taxCoords := uint32(gl.GetAttribLocation(program, gl.Str("vertTexCoord\x00")))
-	gl.EnableVertexAttribArray(taxCoords)
-	gl.VertexAttribPointerWithOffset(taxCoords, 2, gl.FLOAT, false, 4*4, 2*4)
+	texCoords := uint32(gl.GetAttribLocation(program, gl.Str("vertTexCoord\x00")))
+	gl.EnableVertexAttribArray(texCoords)
+	gl.VertexAttribPointerWithOffset(texCoords, 2, gl.FLOAT, false, 4*4, 2*4)
 
 	return Shader(program), nil
 }

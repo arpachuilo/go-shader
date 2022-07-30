@@ -14,16 +14,26 @@ import (
 	"github.com/go-gl/glfw/v3.3/glfw"
 )
 
+// strip layout
 var quadVertices = []float32{
 	// positions   // texCoords
 	-1.0, 1.0, 0.0, 1.0,
+	1.0, 1.0, 1.0, 1.0,
 	-1.0, -1.0, 0.0, 0.0,
 	1.0, -1.0, 1.0, 0.0,
-
-	-1.0, 1.0, 0.0, 1.0,
-	1.0, -1.0, 1.0, 0.0,
-	1.0, 1.0, 1.0, 1.0,
 }
+
+// fan layout
+// var quadVertices = []float32{
+// 	// positions   // texCoords
+// 	-1.0, 1.0, 0.0, 1.0,
+// 	-1.0, -1.0, 0.0, 0.0,
+// 	1.0, -1.0, 1.0, 0.0,
+//
+// 	-1.0, 1.0, 0.0, 1.0,
+// 	1.0, -1.0, 1.0, 0.0,
+// 	1.0, 1.0, 1.0, 1.0,
+// }
 
 var CaptureCmd = "capture"
 
@@ -185,10 +195,21 @@ func (self *Renderer) SwitchToLife() registrable.Registration {
 	}
 }
 
-func (self *Renderer) SwitchToMandelbrot() registrable.Registration {
+func (self *Renderer) SwitchToSmoothLife() registrable.Registration {
 	return KeyCallbackRegistration{
 		action: glfw.Release,
 		key:    glfw.KeyF2,
+		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+			self.Program = NewSmoothLifeProgram()
+			self.Program.Load(self.Window, self.vao, self.vbo)
+		},
+	}
+}
+
+func (self *Renderer) SwitchToMandelbrot() registrable.Registration {
+	return KeyCallbackRegistration{
+		action: glfw.Release,
+		key:    glfw.KeyF3,
 		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 			self.Program = NewMandelbrotProgram()
 			self.Program.Load(self.Window, self.vao, self.vbo)
@@ -199,7 +220,7 @@ func (self *Renderer) SwitchToMandelbrot() registrable.Registration {
 func (self *Renderer) SwitchToJulia() registrable.Registration {
 	return KeyCallbackRegistration{
 		action: glfw.Release,
-		key:    glfw.KeyF3,
+		key:    glfw.KeyF4,
 		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 			self.Program = NewJuliaProgram()
 			self.Program.Load(self.Window, self.vao, self.vbo)
@@ -210,7 +231,7 @@ func (self *Renderer) SwitchToJulia() registrable.Registration {
 func (self *Renderer) SwitchToLiveEdit() registrable.Registration {
 	return KeyCallbackRegistration{
 		action: glfw.Release,
-		key:    glfw.KeyF4,
+		key:    glfw.KeyF5,
 		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 			self.Program = NewLiveEditProgram("./assets/shaders/live_vert.glsl", "./assets/shaders/live_frag.glsl")
 			self.Program.Load(self.Window, self.vao, self.vbo)
@@ -221,7 +242,7 @@ func (self *Renderer) SwitchToLiveEdit() registrable.Registration {
 func (self *Renderer) SwitchToTurtle() registrable.Registration {
 	return KeyCallbackRegistration{
 		action: glfw.Release,
-		key:    glfw.KeyF5,
+		key:    glfw.KeyF6,
 		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 			self.Program = NewTurtleProgram()
 			self.Program.Load(self.Window, self.vao, self.vbo)
@@ -232,7 +253,7 @@ func (self *Renderer) SwitchToTurtle() registrable.Registration {
 func (self *Renderer) SwitchToPong() registrable.Registration {
 	return KeyCallbackRegistration{
 		action: glfw.Release,
-		key:    glfw.KeyF6,
+		key:    glfw.KeyF7,
 		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 			self.Program = NewPongProgram()
 			self.Program.Load(self.Window, self.vao, self.vbo)
@@ -284,6 +305,20 @@ func (self *Renderer) Record() registrable.Registration {
 				self.Recorder.Start()
 			} else {
 				self.Recorder.End()
+			}
+		},
+	}
+}
+
+func (self *Renderer) ToggleAlwaysOnTop() registrable.Registration {
+	return KeyCallbackRegistration{
+		action: glfw.Release,
+		key:    glfw.KeyT,
+		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+			if self.Window.GetAttrib(glfw.Floating) == glfw.True {
+				self.Window.SetAttrib(glfw.Floating, glfw.False)
+			} else {
+				self.Window.SetAttrib(glfw.Floating, glfw.True)
 			}
 		},
 	}
