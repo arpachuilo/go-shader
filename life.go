@@ -76,7 +76,7 @@ func (self *LifeProgram) Load(window *glfw.Window, vao, vbo uint32) {
 	self.Window = window
 	self.vao = vao
 	self.vbo = vbo
-	width, height := window.GetSize()
+	width, height := window.GetFramebufferSize()
 
 	// create textures
 	img1 := *image.NewRGBA(image.Rect(0, 0, width, height))
@@ -127,7 +127,7 @@ func (self *LifeProgram) Load(window *glfw.Window, vao, vbo uint32) {
 }
 
 func (self *LifeProgram) recolor() {
-	width, height := self.Window.GetSize()
+	width, height := self.Window.GetFramebufferSize()
 
 	// use copy program
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
@@ -149,7 +149,7 @@ func (self *LifeProgram) recolor() {
 }
 
 func (self *LifeProgram) life(t float64) {
-	width, height := self.Window.GetSize()
+	width, height := self.Window.GetFramebufferSize()
 	mx, my := self.Window.GetCursorPos()
 
 	// use gol program
@@ -199,7 +199,7 @@ func (self *LifeProgram) life(t float64) {
 }
 
 func (self *LifeProgram) cyclic(t float64) {
-	width, height := self.Window.GetSize()
+	width, height := self.Window.GetFramebufferSize()
 	mx, my := self.Window.GetCursorPos()
 
 	// use cyclic life program

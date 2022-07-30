@@ -54,7 +54,7 @@ func (self *JuliaProgram) Load(window *glfw.Window, vao, vbo uint32) {
 	self.Window = window
 	self.vao = vao
 	self.vbo = vbo
-	width, height := window.GetSize()
+	width, height := window.GetFramebufferSize()
 
 	img := *image.NewRGBA(image.Rect(0, 0, width, height))
 
@@ -85,14 +85,8 @@ func (self *JuliaProgram) Load(window *glfw.Window, vao, vbo uint32) {
 }
 
 func (self *JuliaProgram) Render(t float64) {
-	width, height := self.Window.GetSize()
-	sy, sx := self.Window.GetContentScale()
-	gl.Viewport(
-		0, 0,
-		int32(float32(width)*sx), int32(float32(height)*sy),
-	)
+	width, height := self.Window.GetFramebufferSize()
 
-	// use gol program
 	gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
 	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, self.fractalTexture.Handle, 0)
 

@@ -1,13 +1,12 @@
 #version 410
-uniform sampler2D state;
+uniform sampler2D iChannel1;
 
-uniform float cursorSize;
-uniform float time;
-uniform vec2 scale;
-uniform vec2 mouse;
+uniform float iTime;
+uniform vec2 iResolution;
+uniform vec2 iMouse;
 
-uniform vec2 particles[100]; // particles
-uniform float particleSizes[100];
+uniform vec2 pPos[100]; // particles
+uniform float pSize[100];
 uniform int len;
 
 in vec2 fragTexCoord;
@@ -15,7 +14,7 @@ in vec2 fragTexCoord;
 out vec4 outputColor;
 
 vec4 uv() {
-  return texture(state, vec2(gl_FragCoord.xy) / scale, 0);
+  return texture(iChannel1, vec2(gl_FragCoord.xy) / iResolution, 0);
 }
 
 // line renderer
@@ -23,7 +22,8 @@ void main() {
 
   vec2 c = gl_FragCoord.xy;
   for (int i = 0; i < len; i++) {
-    if (length(c-particles[i]) < particleSizes[i]) {
+    float l = length(c - pPos[1]);
+    if (length(c-pPos[i]) < pSize[i]) {
       outputColor = vec4(1.0);
       return;
     }

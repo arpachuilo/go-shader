@@ -75,7 +75,7 @@ func (self *Renderer) Setup() {
 	}
 
 	// get current resolution
-	self.Width, self.Height = self.Window.GetSize()
+	self.Width, self.Height = self.Window.GetFramebufferSize()
 
 	// get refresh rate
 	self.RefreshRate = float64(glfw.GetPrimaryMonitor().GetVideoMode().RefreshRate)
@@ -102,7 +102,12 @@ func (self *Renderer) Setup() {
 	gl.BufferData(gl.ARRAY_BUFFER, len(quadVertices)*4, gl.Ptr(quadVertices), gl.STATIC_DRAW)
 
 	// Configure global settings
-	gl.ClearColor(1.0, 1.0, 1.0, 1.0)
+	gl.ColorMask(true, true, true, true)
+	gl.ClearColor(0.0, 0.0, 0.0, 0.0)
+	// gl.Clear(gl.COLOR_BUFFER_BIT)
+
+	// gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+	// gl.Enable(gl.BLEND)
 }
 
 func (self *Renderer) SetTickRate(rr float64) {
@@ -122,7 +127,8 @@ var lastTime time.Time
 
 func (self *Renderer) Start(kill <-chan bool) {
 	// self.Program = NewTurtleProgram()
-	self.Program = NewPongProgram()
+	// self.Program = NewPongProgram()
+	self.Program = NewLiveEditProgram("./assets/shaders/live_vert.glsl", "./assets/shaders/live_frag.glsl")
 	self.Program.Load(self.Window, self.vao, self.vbo)
 	for !self.Window.ShouldClose() {
 		select {
@@ -140,7 +146,7 @@ func (self *Renderer) Start(kill <-chan bool) {
 			delta := currentTime.Sub(lastTime)
 			if delta > time.Second {
 				fps := frames / int(delta.Seconds())
-				self.Window.SetTitle(fmt.Sprintf("FPS: %v", fps))
+				self.Window.SetTitle(fmt.Sprintf("%v FPS @ %v x %v", fps, self.Width, self.Height))
 
 				lastTime = currentTime
 				frames = 0
@@ -162,9 +168,10 @@ func (self *Renderer) Start(kill <-chan bool) {
 }
 
 func (self *Renderer) ResizeCallback(w *glfw.Window, width int, height int) {
-	self.Width, self.Height = width, height
+	self.Width, self.Height = w.GetFramebufferSize()
+	gl.Viewport(0, 0, int32(self.Width), int32(self.Height))
 
-	self.Program.ResizeCallback(w, width, height)
+	self.Program.ResizeCallback(w, self.Width, self.Height)
 }
 
 func (self *Renderer) SwitchToLife() registrable.Registration {
@@ -205,7 +212,7 @@ func (self *Renderer) SwitchToLiveEdit() registrable.Registration {
 		action: glfw.Release,
 		key:    glfw.KeyF4,
 		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
-			self.Program = NewLiveEditProgram("./assets/shaders/live_edit.glsl")
+			self.Program = NewLiveEditProgram("./assets/shaders/live_vert.glsl", "./assets/shaders/live_frag.glsl")
 			self.Program.Load(self.Window, self.vao, self.vbo)
 		},
 	}

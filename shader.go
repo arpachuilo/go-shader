@@ -50,6 +50,9 @@ func CompileShader(vertexShaderSource, fragmentShaderSource string) (Shader, err
 		return Shader(math.MaxUint32), fmt.Errorf("failed to link program: %v", log)
 	}
 
+	gl.DetachShader(program, vertexShader)
+	gl.DetachShader(program, fragmentShader)
+
 	gl.DeleteShader(vertexShader)
 	gl.DeleteShader(fragmentShader)
 
@@ -90,6 +93,11 @@ func compileShader(source string, shaderType uint32) (uint32, error) {
 	}
 
 	return shader, nil
+}
+
+func (self Shader) Cleanup() {
+	gl.UseProgram(uint32(self))
+	gl.DeleteProgram(uint32(self))
 }
 
 func (self Shader) Apply(applyFN func(Shader) Shader) Shader {

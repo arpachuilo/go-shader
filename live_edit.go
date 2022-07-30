@@ -2,136 +2,183 @@ package main
 
 import (
 	"image"
-	"io/ioutil"
 	"log"
+	"os"
+	"path/filepath"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
-	"github.com/rjeczalik/notify"
 )
 
 type LiveEditProgram struct {
-	Window *glfw.Window
+	Window        *glfw.Window
+	width, height int
+
+	paused bool
+	frame  int
+
+	watcher *fsnotify.Watcher
 
 	// current texture
 	texture *Texture
 
 	// current shader
+	vert   string
+	frag   string
 	shader Shader
 
 	// name of file to watch for updates
-	filename string
-	pending  chan string
-	watcher  chan notify.EventInfo
+	vertFilename string
+	fragFilename string
 
-	// history of successfuly compiled shaders
-	history []string
+	// history of successfully compiled shaders
+	vertHistory []string
+	fragHistory []string
 
 	// buffers
 	vao, vbo uint32
 }
 
-func NewLiveEditProgram(filename string) Program {
+func NewLiveEditProgram(vert, frag string) Program {
 	return &LiveEditProgram{
-		filename: filename,
-		history:  make([]string, 0),
+		vertFilename: vert,
+		fragFilename: frag,
+		vertHistory:  make([]string, 0),
+		fragHistory:  make([]string, 0),
 	}
 }
 
 func (self *LiveEditProgram) watch() {
-	self.watcher = make(chan notify.EventInfo, 1)
-	self.pending = make(chan string, 1)
-	err := notify.Watch(self.filename, self.watcher, notify.Create, notify.Write)
+	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		panic(err)
 	}
-	defer notify.Stop(self.watcher)
+	// defer watcher.Close()
+
+	log.Println("watching: ", self.fragFilename)
+	watcher.Add(self.vertFilename)
+	watcher.Add(self.fragFilename)
 
 	// initial file load
-	data, err := ioutil.ReadFile(self.filename)
+	vert, err := os.ReadFile(self.vertFilename)
+	frag, err := os.ReadFile(self.fragFilename)
 	if err == nil {
-		self.pending <- string(data)
+		self.compile(string(vert), string(frag))
 	}
 
-	for {
-		select {
-		case ei := <-self.watcher:
-			event := ei.Event()
-			switch event {
-			case notify.Rename:
-				// p.filename = ei.Path()
-			case notify.Write:
-				log.Println("modified file:", ei.Path())
-
-				// read file in
-				data, err := ioutil.ReadFile(self.filename)
-				if err != nil {
-					log.Println("error:", err)
-					continue
-				}
-
-				// attempt to create new shader
-				self.pending <- string(data)
-			}
-		}
-	}
-
+	self.watcher = watcher
 }
 
 func (self *LiveEditProgram) Load(window *glfw.Window, vao, vbo uint32) {
 	self.Window = window
 	self.vao = vao
 	self.vbo = vbo
-	width, height := window.GetSize()
+	self.width, self.height = window.GetFramebufferSize()
 
 	// create textures
-	img := *image.NewRGBA(image.Rect(0, 0, width, height))
+	img := *image.NewRGBA(image.Rect(0, 0, self.width, self.height))
 	self.texture = LoadTexture(&img)
 
+	// load with blank shaders
 	self.shader = MustCompileShader(VertexShader, FragShader)
 
-	go self.watch()
+	self.watch()
 }
 
-func (self *LiveEditProgram) compile(code string) {
-	newShader, err := CompileShader(VertexShader, code)
+func (self *LiveEditProgram) compile(vert, frag string) {
+	newShader, err := CompileShader(vert, frag)
 	if err != nil {
 		log.Println("error", err)
 		return
 	}
 
+	if self.vert != vert {
+		self.vert = vert
+		self.vertHistory = append(self.vertHistory, frag)
+	}
+
+	if self.frag != frag {
+		self.frag = frag
+		self.fragHistory = append(self.fragHistory, frag)
+	}
+
 	self.shader = newShader
-	self.history = append(self.history, code)
+	self.paused = false
+	gl.Clear(gl.COLOR_BUFFER_BIT)
 }
 
 func (self *LiveEditProgram) run(t float64) {
-	width, height := self.Window.GetSize()
 	mx, my := self.Window.GetCursorPos()
 
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
 	gl.BindVertexArray(self.vao)
+	// gl.Clear(gl.COLOR_BUFFER_BIT)
+
 	self.texture.Activate(gl.TEXTURE0)
 
 	self.shader.Use().
-		Uniform1i("state", 0).
-		Uniform1f("time", float32(t)).
-		Uniform2f("mouse", float32(mx), float32(height)-float32(my)).
-		Uniform2f("scale", float32(width), float32(height))
+		Uniform1i("u_frame", int32(self.frame)).
+		Uniform1f("u_time", float32(t)).
+		Uniform2f("u_mouse", float32(mx), float32(self.height)-float32(my)).
+		Uniform2f("u_resolution", float32(self.width), float32(self.height))
 	gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
 }
 
 func (self *LiveEditProgram) Render(t float64) {
 	select {
-	case code := <-self.pending:
-		self.compile(code)
+	case event, ok := <-self.watcher.Events:
+		if !ok {
+			break
+		}
+
+		// have to check "rename" for some reason?!
+		if event.Op == fsnotify.Create || event.Op == fsnotify.Write || event.Op == fsnotify.Rename {
+			log.Println("modified file:", event.Name)
+			self.watcher.Add(event.Name)
+
+			vert := self.vert
+			frag := self.frag
+
+			// read file in
+			data, err := os.ReadFile(event.Name)
+			if err != nil {
+				log.Println("error:", err)
+				break
+			}
+
+			// if strings.ContainsAny
+			enb := filepath.Base(event.Name)
+			vfb := filepath.Base(self.vertFilename)
+			ffb := filepath.Base(self.fragFilename)
+			switch enb {
+			case vfb:
+				vert = string(data)
+			case ffb:
+				frag = string(data)
+			}
+
+			// attempt to create new shader
+			self.compile(string(vert), string(frag))
+		}
 	default:
+		if self.paused {
+			gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
+			return
+		}
+
+		self.frame = self.frame + 1
 		self.run(t)
 	}
 }
 
 func (self *LiveEditProgram) KeyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+	if key == glfw.KeySpace && action == glfw.Release {
+		self.paused = !self.paused
+	}
 }
 
 func (self *LiveEditProgram) ResizeCallback(w *glfw.Window, width int, height int) {
+	self.width, self.height = width, height
 	self.texture.Resize(width, height)
 }

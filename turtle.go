@@ -59,7 +59,8 @@ func (self *Turtle) Advance() (Vector2, Vector2) {
 }
 
 type TurtleProgram struct {
-	Window *glfw.Window
+	Window        *glfw.Window
+	width, height int
 
 	turtle *Turtle
 
@@ -103,11 +104,11 @@ func (self *TurtleProgram) Load(window *glfw.Window, vao, vbo uint32) {
 	self.Window = window
 	self.vao = vao
 	self.vbo = vbo
-	width, height := window.GetSize()
+	self.width, self.height = window.GetFramebufferSize()
 
 	// create textures
-	prev := *image.NewRGBA(image.Rect(0, 0, width, height))
-	next := *image.NewRGBA(image.Rect(0, 0, width, height))
+	prev := *image.NewRGBA(image.Rect(0, 0, self.width, self.height))
+	next := *image.NewRGBA(image.Rect(0, 0, self.width, self.height))
 	for x := 0; x < prev.Rect.Max.X; x++ {
 		for y := 0; y < prev.Rect.Max.Y; y++ {
 			r := uint8(0)
@@ -148,15 +149,15 @@ func (self *TurtleProgram) Load(window *glfw.Window, vao, vbo uint32) {
 
 	// load turtle
 	// center of screen
-	distance := math.Min(float64(width), float64(height)) * 0.25
-	x := (float64(width) / 2.0)
-	y := (float64(height) / 2.0) + (distance / 4.0)
+	distance := math.Min(float64(self.width), float64(self.height)) * 0.25
+	x := (float64(self.width) / 2.0)
+	y := (float64(self.height) / 2.0) + (distance / 4.0)
 	self.turtle.Position = Vector2{x, y}
 	self.turtle.Turn(100)
 }
 
 func (self *TurtleProgram) recolor() {
-	width, height := self.Window.GetSize()
+	width, height := self.Window.GetFramebufferSize()
 
 	// use copy program
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
@@ -171,10 +172,8 @@ func (self *TurtleProgram) recolor() {
 }
 
 func (self *TurtleProgram) run(t float64) {
-	width, height := self.Window.GetSize()
 	mx, my := self.Window.GetCursorPos()
 
-	// use gol program
 	gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
 	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, self.tex.Handle, 0)
 
@@ -186,7 +185,7 @@ func (self *TurtleProgram) run(t float64) {
 
 	// travel 1/12 min(width, height) before turning
 	// uses refresh rate of 60 (make this dynamic later)
-	distance := math.Min(float64(width), float64(height)) * 0.15
+	distance := math.Min(float64(self.width), float64(self.height)) * 0.15
 	pivot1 := int32(distance * self.turtle.Speed)
 	pivot2 := int32(distance*self.turtle.Speed) / 2.0
 	if self.frame%int32(pivot1) == 0 {
@@ -209,8 +208,8 @@ func (self *TurtleProgram) run(t float64) {
 		Uniform2f("a", float32(prev.X), float32(prev.Y)).
 		Uniform2f("b", float32(next.X), float32(next.Y)).
 		Uniform1f("time", float32(t)).
-		Uniform2f("scale", float32(width), float32(height)).
-		Uniform2f("mouse", float32(mx), float32(height)-float32(my))
+		Uniform2f("scale", float32(self.width), float32(self.height)).
+		Uniform2f("mouse", float32(mx), float32(self.height)-float32(my))
 	gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
 
 	// use copy program
@@ -221,7 +220,7 @@ func (self *TurtleProgram) run(t float64) {
 	self.outputShaders.Current().Use().
 		Uniform1i("index", *self.gradientIndex.Current()).
 		Uniform1i("state", 0).
-		Uniform2f("scale", float32(width), float32(height))
+		Uniform2f("scale", float32(self.width), float32(self.height))
 	gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
 }
 
@@ -249,6 +248,7 @@ func (self *TurtleProgram) ScrollCallback(w *glfw.Window, xoff float64, yoff flo
 }
 
 func (self *TurtleProgram) ResizeCallback(w *glfw.Window, width int, height int) {
+	self.width, self.height = self.Window.GetFramebufferSize()
 	self.tex.Resize(width, height)
 }
 

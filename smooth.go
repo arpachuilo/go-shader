@@ -100,7 +100,7 @@ func (self *SmoothLifeProgram) Load(window *glfw.Window, vao, vbo uint32) {
 	self.Window = window
 	self.vao = vao
 	self.vbo = vbo
-	width, height := window.GetSize()
+	width, height := window.GetFramebufferSize()
 
 	// create textures
 	img1 := *image.NewRGBA(image.Rect(0, 0, width, height))
@@ -153,7 +153,7 @@ func (self *SmoothLifeProgram) Load(window *glfw.Window, vao, vbo uint32) {
 }
 
 func (self *SmoothLifeProgram) recolor() {
-	width, height := self.Window.GetSize()
+	width, height := self.Window.GetFramebufferSize()
 	// use copy program
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
 	gl.BindVertexArray(self.vao)
@@ -167,7 +167,7 @@ func (self *SmoothLifeProgram) recolor() {
 }
 
 func (self *SmoothLifeProgram) smooth(t float64) {
-	width, height := self.Window.GetSize()
+	width, height := self.Window.GetFramebufferSize()
 	mx, my := self.Window.GetCursorPos()
 	mb1 := self.Window.GetMouseButton(glfw.MouseButton1)
 	mb2 := self.Window.GetMouseButton(glfw.MouseButton2)

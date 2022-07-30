@@ -32,8 +32,8 @@ func NewPong() *Pong {
 			X: -1.0 + rand.Float64()*2,
 			Y: -1.0 + rand.Float64()*2,
 		}.Normalize(),
-		Speed: 5,
-		Size:  float64(rand.Intn(12) + 3),
+		Speed: rand.Float64()*10 + 1.0,
+		Size:  rand.Float64()*12 + 3,
 	}
 }
 
@@ -52,16 +52,16 @@ func (self *Pong) Turn(degrees float64) Vector2 {
 func (self *Pong) Advance() {
 	next := self.Position.Add(self.Heading.Mul(self.Speed))
 
-	if next.X <= 0.0 {
+	if next.X <= self.Size {
 		self.Heading = self.Heading.Reflect(Vector3Right).Normalize()
 		next = self.Position.Add(self.Heading.Mul(self.Speed))
-	} else if next.X >= float64(self.Width) {
+	} else if next.X >= float64(self.Width)-self.Size {
 		self.Heading = self.Heading.Reflect(Vector3Left).Normalize()
 		next = self.Position.Add(self.Heading.Mul(self.Speed))
-	} else if next.Y <= 0.0 {
+	} else if next.Y <= self.Size {
 		self.Heading = self.Heading.Reflect(Vector3Up).Normalize()
 		next = self.Position.Add(self.Heading.Mul(self.Speed))
-	} else if next.Y >= float64(self.Height) {
+	} else if next.Y >= float64(self.Height)-self.Size {
 		self.Heading = self.Heading.Reflect(Vector3Down).Normalize()
 		next = self.Position.Add(self.Heading.Mul(self.Speed))
 	}
@@ -99,7 +99,7 @@ func NewPongProgram() Program {
 	cmds.Register(RecolorCmd)
 
 	pongs := make([]*Pong, 0)
-	for i := 0; i < 12; i++ {
+	for i := 0; i < 100; i++ {
 		pongs = append(pongs, NewPong())
 	}
 
@@ -119,7 +119,7 @@ func (self *PongProgram) Load(window *glfw.Window, vao, vbo uint32) {
 	self.Window = window
 	self.vao = vao
 	self.vbo = vbo
-	width, height := window.GetSize()
+	width, height := window.GetFramebufferSize()
 
 	// create textures
 	prev := *image.NewRGBA(image.Rect(0, 0, width, height))
@@ -162,19 +162,13 @@ func (self *PongProgram) Load(window *glfw.Window, vao, vbo uint32) {
 
 	self.Window.SetScrollCallback(self.ScrollCallback)
 
-	// load turtle
-	// center of screen
-	// distance := math.Min(float64(width), float64(height)) * 0.25
-	// x := (float64(width) / 2.0)
-	// y := (float64(height) / 2.0) + (distance / 4.0)
-
 	for _, p := range self.pong {
 		p.Resize(width, height)
 	}
 }
 
 func (self *PongProgram) recolor() {
-	width, height := self.Window.GetSize()
+	width, height := self.Window.GetFramebufferSize()
 
 	// use copy program
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
@@ -189,7 +183,7 @@ func (self *PongProgram) recolor() {
 }
 
 func (self *PongProgram) run(t float64) {
-	width, height := self.Window.GetSize()
+	width, height := self.Window.GetFramebufferSize()
 	mx, my := self.Window.GetCursorPos()
 
 	gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
@@ -211,13 +205,13 @@ func (self *PongProgram) run(t float64) {
 	}
 
 	self.pongShader.Use().
-		Uniform1i("state", 0).
-		Uniform1f("time", float32(t)).
-		Uniform2fv("particles", pongs).
-		Uniform1fv("particleSizes", sizes).
+		Uniform2fv("pPos", pongs).
+		Uniform1fv("pSize", sizes).
 		Uniform1i("len", int32(len(self.pong))).
-		Uniform2f("scale", float32(width), float32(height)).
-		Uniform2f("mouse", float32(mx), float32(height)-float32(my))
+		Uniform1i("iChannel1", 0).
+		Uniform1f("iTime", float32(t)).
+		Uniform2f("iResolution", float32(width), float32(height)).
+		Uniform2f("iMouse", float32(mx), float32(height)-float32(my))
 	gl.DrawArrays(gl.TRIANGLE_FAN, 0, 6)
 
 	// use copy program
