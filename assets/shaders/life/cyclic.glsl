@@ -1,3 +1,4 @@
+// cyclic life frag shader
 #version 410
 uniform float stages;
 uniform sampler2D state;

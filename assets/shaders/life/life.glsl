@@ -4,16 +4,16 @@ uniform int b[9];
 uniform sampler2D state;
 
 uniform float cursorSize;
-uniform float time;
-uniform vec2 scale;
-uniform vec2 mouse;
+uniform float u_time;
+uniform vec2 u_resolution;
+uniform vec2 u_mouse;
 
 in vec2 fragTexCoord;
 
 out vec4 outputColor;
 
 vec4 get(vec2 coord) {
-  return texture(state, vec2(gl_FragCoord.xy + coord) / scale, 0);
+  return texture(state, vec2(gl_FragCoord.xy + coord) / u_resolution, 0);
 }
 
 float random (vec2 st) {
@@ -21,12 +21,13 @@ float random (vec2 st) {
 }
 
 ivec4 alive(vec4 cell) {
-  return ivec4(
-    cell.r > 0.5 ? 1 : 0,
-    cell.g > 0.5 ? 1 : 0,
-    cell.b > 0.5 ? 1 : 0,
-    cell.a > 0.5 ? 1 : 0
-  );
+  return ivec4(step(0.5, cell));
+  // return ivec4(
+  //   cell.r > 0.5 ? 1 : 0,
+  //   cell.g > 0.5 ? 1 : 0,
+  //   cell.b > 0.5 ? 1 : 0,
+  //   cell.a > 0.5 ? 1 : 0
+  // );
 }
 
 float op(float c, int n) {
@@ -61,15 +62,15 @@ float op(float c, int n) {
 
 void main() {
   vec2 pos = gl_FragCoord.xy;
-  if (mouse.x < (0.01 * scale.x) && time > 1) {
+  if (u_mouse.x < (0.01 * u_resolution.x) && u_time > 1) {
     outputColor = vec4(0.0);
     return;
-  } else if (mouse.x > (0.99 * scale.x) || length(pos-mouse) < (cursorSize * scale.x)) {
+  } else if (u_mouse.x > (0.99 * u_resolution.x) || length(pos-u_mouse) < (cursorSize * u_resolution.x)) {
     outputColor = vec4(
-      random(pos / scale),
-      random(mouse / scale),
-      random(vec2(sin(time), sin(time)) / scale),
-      random(vec2(cos(time), cos(time)) / scale)
+      random(pos / u_resolution),
+      random(u_mouse / u_resolution),
+      random(vec2(sin(u_time), sin(u_time)) / u_resolution),
+      random(vec2(cos(u_time), cos(u_time)) / u_resolution)
     );
     return;
   }

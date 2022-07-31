@@ -14,27 +14,6 @@ import (
 	"github.com/go-gl/glfw/v3.3/glfw"
 )
 
-// strip layout
-var quadVertices = []float32{
-	// positions   // texCoords
-	-1.0, 1.0, 0.0, 1.0,
-	1.0, 1.0, 1.0, 1.0,
-	-1.0, -1.0, 0.0, 0.0,
-	1.0, -1.0, 1.0, 0.0,
-}
-
-// fan layout
-// var quadVertices = []float32{
-// 	// positions   // texCoords
-// 	-1.0, 1.0, 0.0, 1.0,
-// 	-1.0, -1.0, 0.0, 0.0,
-// 	1.0, -1.0, 1.0, 0.0,
-//
-// 	-1.0, 1.0, 0.0, 1.0,
-// 	1.0, -1.0, 1.0, 0.0,
-// 	1.0, 1.0, 1.0, 1.0,
-// }
-
 var CaptureCmd = "capture"
 
 // Renderer handles running our programs
@@ -44,6 +23,7 @@ type Renderer struct {
 	wPosX, wPosY   int
 	wSizeX, wSizeY int
 
+	Wireframe         bool
 	Tick              *time.Ticker
 	RefreshRate       float64
 	UnlockedFrameRate bool
@@ -53,9 +33,7 @@ type Renderer struct {
 	Cmds              CmdChannels
 
 	Recorder *Recorder
-
-	vao uint32
-	vbo uint32
+	bo       BufferObject
 
 	*KeyRegister
 }
@@ -103,18 +81,14 @@ func (self *Renderer) Setup() {
 	self.Window.SetKeyCallback(self.KeyCallback)
 	self.Window.SetSizeCallback(self.ResizeCallback)
 
-	// configure the vertex data
-	gl.GenVertexArrays(1, &self.vao)
-	gl.BindVertexArray(self.vao)
-
-	gl.GenBuffers(1, &self.vbo)
-	gl.BindBuffer(gl.ARRAY_BUFFER, self.vbo)
-	gl.BufferData(gl.ARRAY_BUFFER, len(quadVertices)*4, gl.Ptr(quadVertices), gl.STATIC_DRAW)
+	self.bo = NewVIBuffer(C1Vertices, C1Indices, 48)
+	// self.bo = NewVIBuffer(C1Vertices, C1AltIndices, 36)
+	// self.bo = NewVBuffer(QuadVertices, 4)
 
 	// Configure global settings
 	gl.ColorMask(true, true, true, true)
 	gl.ClearColor(0.0, 0.0, 0.0, 0.0)
-	// gl.Clear(gl.COLOR_BUFFER_BIT)
+	gl.Clear(gl.COLOR_BUFFER_BIT)
 
 	// gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 	// gl.Enable(gl.BLEND)
@@ -138,8 +112,9 @@ var lastTime time.Time
 func (self *Renderer) Start(kill <-chan bool) {
 	// self.Program = NewTurtleProgram()
 	// self.Program = NewPongProgram()
-	self.Program = NewLiveEditProgram("./assets/shaders/live_vert.glsl", "./assets/shaders/live_frag.glsl")
-	self.Program.Load(self.Window, self.vao, self.vbo)
+	self.Program = NewLifeProgram()
+	// self.Program = NewLiveEditProgram("./assets/shaders/live_vert.glsl", "./assets/shaders/live_frag.glsl")
+	self.Program.Load(self.Window, self.bo)
 	for !self.Window.ShouldClose() {
 		select {
 		// kill
@@ -190,7 +165,7 @@ func (self *Renderer) SwitchToLife() registrable.Registration {
 		key:    glfw.KeyF1,
 		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 			self.Program = NewLifeProgram()
-			self.Program.Load(self.Window, self.vao, self.vbo)
+			self.Program.Load(self.Window, self.bo)
 		},
 	}
 }
@@ -201,7 +176,7 @@ func (self *Renderer) SwitchToSmoothLife() registrable.Registration {
 		key:    glfw.KeyF2,
 		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 			self.Program = NewSmoothLifeProgram()
-			self.Program.Load(self.Window, self.vao, self.vbo)
+			self.Program.Load(self.Window, self.bo)
 		},
 	}
 }
@@ -212,7 +187,7 @@ func (self *Renderer) SwitchToMandelbrot() registrable.Registration {
 		key:    glfw.KeyF3,
 		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 			self.Program = NewMandelbrotProgram()
-			self.Program.Load(self.Window, self.vao, self.vbo)
+			self.Program.Load(self.Window, self.bo)
 		},
 	}
 }
@@ -223,7 +198,7 @@ func (self *Renderer) SwitchToJulia() registrable.Registration {
 		key:    glfw.KeyF4,
 		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 			self.Program = NewJuliaProgram()
-			self.Program.Load(self.Window, self.vao, self.vbo)
+			self.Program.Load(self.Window, self.bo)
 		},
 	}
 }
@@ -234,7 +209,7 @@ func (self *Renderer) SwitchToLiveEdit() registrable.Registration {
 		key:    glfw.KeyF5,
 		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 			self.Program = NewLiveEditProgram("./assets/shaders/live_vert.glsl", "./assets/shaders/live_frag.glsl")
-			self.Program.Load(self.Window, self.vao, self.vbo)
+			self.Program.Load(self.Window, self.bo)
 		},
 	}
 }
@@ -245,7 +220,7 @@ func (self *Renderer) SwitchToTurtle() registrable.Registration {
 		key:    glfw.KeyF6,
 		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 			self.Program = NewTurtleProgram()
-			self.Program.Load(self.Window, self.vao, self.vbo)
+			self.Program.Load(self.Window, self.bo)
 		},
 	}
 }
@@ -256,7 +231,7 @@ func (self *Renderer) SwitchToPong() registrable.Registration {
 		key:    glfw.KeyF7,
 		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 			self.Program = NewPongProgram()
-			self.Program.Load(self.Window, self.vao, self.vbo)
+			self.Program.Load(self.Window, self.bo)
 		},
 	}
 }
@@ -333,6 +308,22 @@ func (self *Renderer) ToggleCursor() registrable.Registration {
 				self.Window.SetInputMode(glfw.CursorMode, glfw.CursorNormal)
 			} else {
 				self.Window.SetInputMode(glfw.CursorMode, glfw.CursorDisabled)
+			}
+		},
+	}
+}
+
+func (self *Renderer) ToggleWireframe() registrable.Registration {
+	return KeyCallbackRegistration{
+		action: glfw.Release,
+		key:    glfw.KeyD,
+		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+			self.Wireframe = !self.Wireframe
+
+			if self.Wireframe {
+				gl.PolygonMode(gl.FRONT_AND_BACK, gl.LINE)
+			} else {
+				gl.PolygonMode(gl.FRONT_AND_BACK, gl.FILL)
 			}
 		},
 	}

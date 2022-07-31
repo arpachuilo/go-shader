@@ -11,7 +11,7 @@ func NewNoopProgram() Program {
 	return &NoopProgram{}
 }
 
-func (self *NoopProgram) Load(window *glfw.Window, vao, vbo uint32) {
+func (self *NoopProgram) Load(window *glfw.Window, bo BufferObject) {
 }
 
 func (self *NoopProgram) Render(t float64) {

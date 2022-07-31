@@ -30,7 +30,8 @@ type MandelbrotProgram struct {
 	mouseDelta *MouseDelta
 
 	// buffers
-	fbo, vao, vbo uint32
+	fbo uint32
+	bo  BufferObject
 }
 
 func NewMandelbrotProgram() Program {
@@ -47,10 +48,9 @@ func NewMandelbrotProgram() Program {
 	}
 }
 
-func (self *MandelbrotProgram) Load(window *glfw.Window, vao, vbo uint32) {
+func (self *MandelbrotProgram) Load(window *glfw.Window, bo BufferObject) {
 	self.Window = window
-	self.vao = vao
-	self.vbo = vbo
+	self.bo = bo
 	width, height := window.GetFramebufferSize()
 
 	img := *image.NewRGBA(image.Rect(0, 0, width, height))
@@ -59,19 +59,19 @@ func (self *MandelbrotProgram) Load(window *glfw.Window, vao, vbo uint32) {
 	self.fractalTexture = LoadTexture(&img)
 
 	// create compute shaders
-	self.fractalShader = MustCompileShader(VertexShader, MandelbrotShader)
+	self.fractalShader = MustCompileShader(VertexShader, MandelbrotShader, self.bo)
 
 	// create output shaders
 	self.outputShaders = *newCyclicArray([]Shader{
-		MustCompileShader(VertexShader, ViridisShader),
-		MustCompileShader(VertexShader, InfernoShader),
-		MustCompileShader(VertexShader, MagmaShader),
-		MustCompileShader(VertexShader, PlasmaShader),
-		MustCompileShader(VertexShader, CividisShader),
-		MustCompileShader(VertexShader, TurboShader),
-		MustCompileShader(VertexShader, SinebowShader),
-		MustCompileShader(VertexShader, RGBShader),
-		MustCompileShader(VertexShader, RGBAShader),
+		MustCompileShader(VertexShader, ViridisShader, self.bo),
+		MustCompileShader(VertexShader, InfernoShader, self.bo),
+		MustCompileShader(VertexShader, MagmaShader, self.bo),
+		MustCompileShader(VertexShader, PlasmaShader, self.bo),
+		MustCompileShader(VertexShader, CividisShader, self.bo),
+		MustCompileShader(VertexShader, TurboShader, self.bo),
+		MustCompileShader(VertexShader, SinebowShader, self.bo),
+		MustCompileShader(VertexShader, RGBShader, self.bo),
+		MustCompileShader(VertexShader, RGBAShader, self.bo),
 	})
 
 	// create framebuffers
@@ -92,7 +92,7 @@ func (self *MandelbrotProgram) Render(t float64) {
 	gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
 	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, self.fractalTexture.Handle, 0)
 
-	gl.BindVertexArray(self.vao)
+	gl.BindVertexArray(self.bo.VAO())
 	self.fractalTexture.Activate(gl.TEXTURE0)
 
 	self.fractalShader.Use().
@@ -100,18 +100,18 @@ func (self *MandelbrotProgram) Render(t float64) {
 		Uniform2f("focus", float32(self.x), float32(self.y)).
 		Uniform1f("zoom", float32(self.zoom)).
 		Uniform2f("scale", float32(width), float32(height))
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+	self.bo.Draw()
 
 	// use copy program
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
-	gl.BindVertexArray(self.vao)
+	gl.BindVertexArray(self.bo.VAO())
 	self.fractalTexture.Activate(gl.TEXTURE0)
 
 	self.outputShaders.Current().Use().
 		Uniform1i("index", 0).
 		Uniform1i("state", 0).
 		Uniform2f("scale", float32(width), float32(height))
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+	self.bo.Draw()
 }
 
 func (self *MandelbrotProgram) ZoomOut() {

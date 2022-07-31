@@ -37,7 +37,7 @@ type LiveEditProgram struct {
 	fragHistory []string
 
 	// buffers
-	vao, vbo uint32
+	bo BufferObject
 }
 
 func NewLiveEditProgram(vert, frag string) Program {
@@ -70,10 +70,9 @@ func (self *LiveEditProgram) watch() {
 	self.watcher = watcher
 }
 
-func (self *LiveEditProgram) Load(window *glfw.Window, vao, vbo uint32) {
+func (self *LiveEditProgram) Load(window *glfw.Window, bo BufferObject) {
 	self.Window = window
-	self.vao = vao
-	self.vbo = vbo
+	self.bo = bo
 	self.width, self.height = window.GetFramebufferSize()
 
 	// create textures
@@ -81,13 +80,13 @@ func (self *LiveEditProgram) Load(window *glfw.Window, vao, vbo uint32) {
 	self.texture = LoadTexture(&img)
 
 	// load with blank shaders
-	self.shader = MustCompileShader(VertexShader, FragShader)
+	self.shader = MustCompileShader(VertexShader, FragShader, self.bo)
 
 	self.watch()
 }
 
 func (self *LiveEditProgram) compile(vert, frag string) {
-	newShader, err := CompileShader(vert, frag)
+	newShader, err := CompileShader(vert, frag, self.bo)
 	if err != nil {
 		log.Println("error", err)
 		return
@@ -105,15 +104,14 @@ func (self *LiveEditProgram) compile(vert, frag string) {
 
 	self.shader = newShader
 	self.paused = false
-	gl.Clear(gl.COLOR_BUFFER_BIT)
 }
 
 func (self *LiveEditProgram) run(t float64) {
 	mx, my := self.Window.GetCursorPos()
 
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
-	gl.BindVertexArray(self.vao)
-	// gl.Clear(gl.COLOR_BUFFER_BIT)
+	gl.BindVertexArray(self.bo.VAO())
+	gl.Clear(gl.COLOR_BUFFER_BIT)
 
 	self.texture.Activate(gl.TEXTURE0)
 
@@ -122,7 +120,7 @@ func (self *LiveEditProgram) run(t float64) {
 		Uniform1f("u_time", float32(t)).
 		Uniform2f("u_mouse", float32(mx), float32(self.height)-float32(my)).
 		Uniform2f("u_resolution", float32(self.width), float32(self.height))
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+	self.bo.Draw()
 }
 
 func (self *LiveEditProgram) Render(t float64) {
@@ -163,7 +161,7 @@ func (self *LiveEditProgram) Render(t float64) {
 		}
 	default:
 		if self.paused {
-			gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+			self.bo.Draw()
 			return
 		}
 

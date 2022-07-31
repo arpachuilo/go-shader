@@ -11,8 +11,8 @@ import (
 type Shader uint32
 
 // MustCompileShader create a new shader program that must compile.
-func MustCompileShader(vertexShaderSource, fragmentShaderSource string) Shader {
-	shader, err := CompileShader(vertexShaderSource, fragmentShaderSource)
+func MustCompileShader(vertexShaderSource, fragmentShaderSource string, bo BufferObject) Shader {
+	shader, err := CompileShader(vertexShaderSource, fragmentShaderSource, bo)
 	if err != nil {
 		panic(err)
 	}
@@ -22,7 +22,7 @@ func MustCompileShader(vertexShaderSource, fragmentShaderSource string) Shader {
 
 // CompileShader create a new shader program.
 // TODO: stop hard coding to the quad
-func CompileShader(vertexShaderSource, fragmentShaderSource string) (Shader, error) {
+func CompileShader(vertexShaderSource, fragmentShaderSource string, bo BufferObject) (Shader, error) {
 	vertexShader, err := compileShader(vertexShaderSource+"\x00", gl.VERTEX_SHADER)
 	if err != nil {
 		return Shader(math.MaxUint32), err
@@ -60,15 +60,16 @@ func CompileShader(vertexShaderSource, fragmentShaderSource string) (Shader, err
 	// bind output color location
 	gl.BindFragDataLocation(program, 0, gl.Str("outputColor\x00"))
 
+	// bind buffer object
 	// bind vertex coordinates
 	vertCoords := uint32(gl.GetAttribLocation(program, gl.Str("vert\x00")))
 	gl.EnableVertexAttribArray(vertCoords)
-	gl.VertexAttribPointerWithOffset(vertCoords, 2, gl.FLOAT, false, 4*4, 0)
+	gl.VertexAttribPointerWithOffset(vertCoords, 2, gl.FLOAT, false, bo.GetVertices().VertexSize(), 0)
 
 	// bind texture coordinates
 	texCoords := uint32(gl.GetAttribLocation(program, gl.Str("vertTexCoord\x00")))
 	gl.EnableVertexAttribArray(texCoords)
-	gl.VertexAttribPointerWithOffset(texCoords, 2, gl.FLOAT, false, 4*4, 2*4)
+	gl.VertexAttribPointerWithOffset(texCoords, 2, gl.FLOAT, false, bo.GetVertices().VertexSize(), uintptr(bo.GetVertices().TexOffset()))
 
 	return Shader(program), nil
 }

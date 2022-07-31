@@ -81,7 +81,8 @@ type TurtleProgram struct {
 	gradientIndex cyclicArray[int32]
 
 	// buffers
-	fbo, vao, vbo uint32
+	fbo uint32
+	bo  BufferObject
 }
 
 func NewTurtleProgram() Program {
@@ -100,10 +101,9 @@ func NewTurtleProgram() Program {
 	}
 }
 
-func (self *TurtleProgram) Load(window *glfw.Window, vao, vbo uint32) {
+func (self *TurtleProgram) Load(window *glfw.Window, bo BufferObject) {
 	self.Window = window
-	self.vao = vao
-	self.vbo = vbo
+	self.bo = bo
 	self.width, self.height = window.GetFramebufferSize()
 
 	// create textures
@@ -126,19 +126,19 @@ func (self *TurtleProgram) Load(window *glfw.Window, vao, vbo uint32) {
 	self.tex = LoadTexture(&prev)
 
 	// create compute shaders
-	self.turtleShader = MustCompileShader(VertexShader, TurtleShader)
+	self.turtleShader = MustCompileShader(VertexShader, TurtleShader, self.bo)
 
 	// create output shaders
 	self.outputShaders = *newCyclicArray([]Shader{
-		MustCompileShader(VertexShader, ViridisShader),
-		MustCompileShader(VertexShader, InfernoShader),
-		MustCompileShader(VertexShader, MagmaShader),
-		MustCompileShader(VertexShader, PlasmaShader),
-		MustCompileShader(VertexShader, CividisShader),
-		MustCompileShader(VertexShader, TurboShader),
-		MustCompileShader(VertexShader, SinebowShader),
-		MustCompileShader(VertexShader, RGBShader),
-		MustCompileShader(VertexShader, RGBAShader),
+		MustCompileShader(VertexShader, ViridisShader, self.bo),
+		MustCompileShader(VertexShader, InfernoShader, self.bo),
+		MustCompileShader(VertexShader, MagmaShader, self.bo),
+		MustCompileShader(VertexShader, PlasmaShader, self.bo),
+		MustCompileShader(VertexShader, CividisShader, self.bo),
+		MustCompileShader(VertexShader, TurboShader, self.bo),
+		MustCompileShader(VertexShader, SinebowShader, self.bo),
+		MustCompileShader(VertexShader, RGBShader, self.bo),
+		MustCompileShader(VertexShader, RGBAShader, self.bo),
 	})
 
 	// create framebuffers
@@ -161,14 +161,14 @@ func (self *TurtleProgram) recolor() {
 
 	// use copy program
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
-	gl.BindVertexArray(self.vao)
+	gl.BindVertexArray(self.bo.VAO())
 
 	self.tex.Activate(gl.TEXTURE0)
 	self.outputShaders.Current().Use().
 		Uniform1i("index", *self.gradientIndex.Current()).
 		Uniform1i("state", 0).
 		Uniform2f("scale", float32(width), float32(height))
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+	self.bo.Draw()
 }
 
 func (self *TurtleProgram) run(t float64) {
@@ -177,7 +177,7 @@ func (self *TurtleProgram) run(t float64) {
 	gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
 	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, self.tex.Handle, 0)
 
-	gl.BindVertexArray(self.vao)
+	gl.BindVertexArray(self.bo.VAO())
 	self.tex.Activate(gl.TEXTURE0)
 
 	// prev, next := self.turtle.Dot()
@@ -210,18 +210,18 @@ func (self *TurtleProgram) run(t float64) {
 		Uniform1f("time", float32(t)).
 		Uniform2f("scale", float32(self.width), float32(self.height)).
 		Uniform2f("mouse", float32(mx), float32(self.height)-float32(my))
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+	self.bo.Draw()
 
 	// use copy program
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
-	gl.BindVertexArray(self.vao)
+	gl.BindVertexArray(self.bo.VAO())
 	self.tex.Activate(gl.TEXTURE0)
 
 	self.outputShaders.Current().Use().
 		Uniform1i("index", *self.gradientIndex.Current()).
 		Uniform1i("state", 0).
 		Uniform2f("scale", float32(self.width), float32(self.height))
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+	self.bo.Draw()
 }
 
 func (self *TurtleProgram) Render(t float64) {
@@ -230,7 +230,7 @@ func (self *TurtleProgram) Render(t float64) {
 		self.recolor()
 	default:
 		if self.paused {
-			gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+			self.bo.Draw()
 			return
 		}
 

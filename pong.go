@@ -91,7 +91,8 @@ type PongProgram struct {
 	gradientIndex cyclicArray[int32]
 
 	// buffers
-	fbo, vao, vbo uint32
+	fbo uint32
+	bo  BufferObject
 }
 
 func NewPongProgram() Program {
@@ -115,10 +116,9 @@ func NewPongProgram() Program {
 	}
 }
 
-func (self *PongProgram) Load(window *glfw.Window, vao, vbo uint32) {
+func (self *PongProgram) Load(window *glfw.Window, bo BufferObject) {
 	self.Window = window
-	self.vao = vao
-	self.vbo = vbo
+	self.bo = bo
 	width, height := window.GetFramebufferSize()
 
 	// create textures
@@ -141,19 +141,19 @@ func (self *PongProgram) Load(window *glfw.Window, vao, vbo uint32) {
 	self.tex = LoadTexture(&prev)
 
 	// create compute shaders
-	self.pongShader = MustCompileShader(VertexShader, PongShader)
+	self.pongShader = MustCompileShader(VertexShader, PongShader, self.bo)
 
 	// create output shaders
 	self.outputShaders = *newCyclicArray([]Shader{
-		MustCompileShader(VertexShader, ViridisShader),
-		MustCompileShader(VertexShader, InfernoShader),
-		MustCompileShader(VertexShader, MagmaShader),
-		MustCompileShader(VertexShader, PlasmaShader),
-		MustCompileShader(VertexShader, CividisShader),
-		MustCompileShader(VertexShader, TurboShader),
-		MustCompileShader(VertexShader, SinebowShader),
-		MustCompileShader(VertexShader, RGBShader),
-		MustCompileShader(VertexShader, RGBAShader),
+		MustCompileShader(VertexShader, ViridisShader, self.bo),
+		MustCompileShader(VertexShader, InfernoShader, self.bo),
+		MustCompileShader(VertexShader, MagmaShader, self.bo),
+		MustCompileShader(VertexShader, PlasmaShader, self.bo),
+		MustCompileShader(VertexShader, CividisShader, self.bo),
+		MustCompileShader(VertexShader, TurboShader, self.bo),
+		MustCompileShader(VertexShader, SinebowShader, self.bo),
+		MustCompileShader(VertexShader, RGBShader, self.bo),
+		MustCompileShader(VertexShader, RGBAShader, self.bo),
 	})
 
 	// create framebuffers
@@ -172,14 +172,14 @@ func (self *PongProgram) recolor() {
 
 	// use copy program
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
-	gl.BindVertexArray(self.vao)
+	gl.BindVertexArray(self.bo.VAO())
 
 	self.tex.Activate(gl.TEXTURE0)
 	self.outputShaders.Current().Use().
 		Uniform1i("index", *self.gradientIndex.Current()).
 		Uniform1i("state", 0).
 		Uniform2f("scale", float32(width), float32(height))
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+	self.bo.Draw()
 }
 
 func (self *PongProgram) run(t float64) {
@@ -189,7 +189,7 @@ func (self *PongProgram) run(t float64) {
 	gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
 	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, self.tex.Handle, 0)
 
-	gl.BindVertexArray(self.vao)
+	gl.BindVertexArray(self.bo.VAO())
 	self.tex.Activate(gl.TEXTURE0)
 
 	for _, p := range self.pong {
@@ -212,11 +212,11 @@ func (self *PongProgram) run(t float64) {
 		Uniform1f("iTime", float32(t)).
 		Uniform2f("iResolution", float32(width), float32(height)).
 		Uniform2f("iMouse", float32(mx), float32(height)-float32(my))
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+	self.bo.Draw()
 
 	// use copy program
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
-	gl.BindVertexArray(self.vao)
+	gl.BindVertexArray(self.bo.VAO())
 	self.tex.Activate(gl.TEXTURE0)
 
 	self.outputShaders.Current().Use().
@@ -224,7 +224,7 @@ func (self *PongProgram) run(t float64) {
 		Uniform1f("alpha", float32(self.alpha)).
 		Uniform1i("state", 0).
 		Uniform2f("scale", float32(width), float32(height))
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+	self.bo.Draw()
 }
 
 func (self *PongProgram) Render(t float64) {
@@ -233,7 +233,7 @@ func (self *PongProgram) Render(t float64) {
 		self.recolor()
 	default:
 		if self.paused {
-			gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+			self.bo.Draw()
 			return
 		}
 

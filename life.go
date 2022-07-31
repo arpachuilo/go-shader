@@ -20,7 +20,8 @@ const (
 )
 
 type LifeProgram struct {
-	Window *glfw.Window
+	Window        *glfw.Window
+	width, height int
 
 	// rule set
 	survive []int32
@@ -48,7 +49,8 @@ type LifeProgram struct {
 	gradientIndex cyclicArray[int32]
 
 	// buffers
-	fbo, vao, vbo uint32
+	fbo uint32
+	bo  BufferObject
 }
 
 func NewLifeProgram() Program {
@@ -72,16 +74,15 @@ func NewLifeProgram() Program {
 	}
 }
 
-func (self *LifeProgram) Load(window *glfw.Window, vao, vbo uint32) {
+func (self *LifeProgram) Load(window *glfw.Window, bo BufferObject) {
 	self.Window = window
-	self.vao = vao
-	self.vbo = vbo
-	width, height := window.GetFramebufferSize()
+	self.bo = bo
+	self.width, self.height = window.GetFramebufferSize()
 
 	// create textures
-	img1 := *image.NewRGBA(image.Rect(0, 0, width, height))
-	img2 := *image.NewRGBA(image.Rect(0, 0, width, height))
-	img3 := *image.NewRGBA(image.Rect(0, 0, width, height))
+	img1 := *image.NewRGBA(image.Rect(0, 0, self.width, self.height))
+	img2 := *image.NewRGBA(image.Rect(0, 0, self.width, self.height))
+	img3 := *image.NewRGBA(image.Rect(0, 0, self.width, self.height))
 	for x := 0; x < img1.Rect.Max.X; x++ {
 		for y := 0; y < img1.Rect.Max.Y; y++ {
 			r := uint8(rand.Intn(255))
@@ -102,21 +103,21 @@ func (self *LifeProgram) Load(window *glfw.Window, vao, vbo uint32) {
 	self.growthDecayTexture = LoadTexture(&img3)
 
 	// create compute shaders
-	self.cyclicShader = MustCompileShader(VertexShader, CyclicShader)
-	self.lifeShader = MustCompileShader(VertexShader, GOLShader)
-	self.growthDecayShader = MustCompileShader(VertexShader, GainShader)
+	self.cyclicShader = MustCompileShader(VertexShader, CyclicShader, self.bo)
+	self.lifeShader = MustCompileShader(VertexShader, GOLShader, self.bo)
+	self.growthDecayShader = MustCompileShader(VertexShader, GainShader, self.bo)
 
 	// create output shaders
 	self.outputShaders = *newCyclicArray([]Shader{
-		MustCompileShader(VertexShader, ViridisShader),
-		MustCompileShader(VertexShader, InfernoShader),
-		MustCompileShader(VertexShader, MagmaShader),
-		MustCompileShader(VertexShader, PlasmaShader),
-		MustCompileShader(VertexShader, CividisShader),
-		MustCompileShader(VertexShader, TurboShader),
-		MustCompileShader(VertexShader, SinebowShader),
-		MustCompileShader(VertexShader, RGBShader),
-		MustCompileShader(VertexShader, RGBAShader),
+		MustCompileShader(VertexShader, ViridisShader, self.bo),
+		MustCompileShader(VertexShader, InfernoShader, self.bo),
+		MustCompileShader(VertexShader, MagmaShader, self.bo),
+		MustCompileShader(VertexShader, PlasmaShader, self.bo),
+		MustCompileShader(VertexShader, CividisShader, self.bo),
+		MustCompileShader(VertexShader, TurboShader, self.bo),
+		MustCompileShader(VertexShader, SinebowShader, self.bo),
+		MustCompileShader(VertexShader, RGBShader, self.bo),
+		MustCompileShader(VertexShader, RGBAShader, self.bo),
 	})
 
 	// create framebuffers
@@ -127,11 +128,9 @@ func (self *LifeProgram) Load(window *glfw.Window, vao, vbo uint32) {
 }
 
 func (self *LifeProgram) recolor() {
-	width, height := self.Window.GetFramebufferSize()
-
 	// use copy program
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
-	gl.BindVertexArray(self.vao)
+	gl.BindVertexArray(self.bo.VAO())
 
 	switch self.mode {
 	case LifeStd:
@@ -143,20 +142,20 @@ func (self *LifeProgram) recolor() {
 	self.outputShaders.Current().Use().
 		Uniform1i("index", *self.gradientIndex.Current()).
 		Uniform1i("state", 0).
-		Uniform2f("scale", float32(width), float32(height))
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+		Uniform2f("scale", float32(self.width), float32(self.height))
+	self.bo.Draw()
 
 }
 
 func (self *LifeProgram) life(t float64) {
-	width, height := self.Window.GetFramebufferSize()
 	mx, my := self.Window.GetCursorPos()
 
+	gl.Clear(gl.COLOR_BUFFER_BIT)
 	// use gol program
 	gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
 	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, self.nextTexture.Handle, 0)
 
-	gl.BindVertexArray(self.vao)
+	gl.BindVertexArray(self.bo.VAO())
 	self.prevTexture.Activate(gl.TEXTURE0)
 
 	self.lifeShader.Use().
@@ -164,10 +163,14 @@ func (self *LifeProgram) life(t float64) {
 		Uniform1iv("b", self.birth).
 		Uniform1i("state", 0).
 		Uniform1f("cursorSize", float32(self.cursorSize)).
-		Uniform1f("time", float32(t)).
-		Uniform2f("scale", float32(width), float32(height)).
-		Uniform2f("mouse", float32(mx), float32(height)-float32(my))
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+		// Uniform1f("time", float32(t)).
+		// Uniform2f("scale", float32(width), float32(height)).
+		// Uniform2f("mouse", float32(mx), float32(height)-float32(my)),
+		Uniform1i("u_frame", int32(self.frame)).
+		Uniform1f("u_time", float32(t)).
+		Uniform2f("u_mouse", float32(mx), float32(self.height)-float32(my)).
+		Uniform2f("u_resolution", float32(self.width), float32(self.height))
+	self.bo.Draw()
 
 	// swap texture
 	self.prevTexture, self.nextTexture = self.nextTexture, self.prevTexture
@@ -176,37 +179,36 @@ func (self *LifeProgram) life(t float64) {
 	gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
 	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, self.growthDecayTexture.Handle, 0)
 
-	gl.BindVertexArray(self.vao)
+	gl.BindVertexArray(self.bo.VAO())
 	self.prevTexture.Activate(gl.TEXTURE0)
 	self.growthDecayTexture.Activate(gl.TEXTURE1)
 
 	self.growthDecayShader.Use().
 		Uniform1i("state", 0).
 		Uniform1i("self", 1).
-		Uniform2f("scale", float32(width), float32(height))
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+		Uniform2f("scale", float32(self.width), float32(self.height))
+	self.bo.Draw()
 
 	// use copy program
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
-	gl.BindVertexArray(self.vao)
+	gl.BindVertexArray(self.bo.VAO())
 	self.growthDecayTexture.Activate(gl.TEXTURE0)
 
 	self.outputShaders.Current().Use().
 		Uniform1i("index", *self.gradientIndex.Current()).
 		Uniform1i("state", 0).
-		Uniform2f("scale", float32(width), float32(height))
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+		Uniform2f("scale", float32(self.width), float32(self.height))
+	self.bo.Draw()
 }
 
 func (self *LifeProgram) cyclic(t float64) {
-	width, height := self.Window.GetFramebufferSize()
 	mx, my := self.Window.GetCursorPos()
 
 	// use cyclic life program
 	gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
 	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, self.nextTexture.Handle, 0)
 
-	gl.BindVertexArray(self.vao)
+	gl.BindVertexArray(self.bo.VAO())
 	self.prevTexture.Activate(gl.TEXTURE0)
 
 	self.cyclicShader.Use().
@@ -214,23 +216,23 @@ func (self *LifeProgram) cyclic(t float64) {
 		Uniform1i("state", 0).
 		Uniform1f("cursorSize", float32(self.cursorSize)).
 		Uniform1f("time", float32(t)).
-		Uniform2f("scale", float32(width), float32(height)).
-		Uniform2f("mouse", float32(mx), float32(height)-float32(my))
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+		Uniform2f("scale", float32(self.width), float32(self.height)).
+		Uniform2f("mouse", float32(mx), float32(self.height)-float32(my))
+	self.bo.Draw()
 
 	// swap texture
 	self.prevTexture, self.nextTexture = self.nextTexture, self.prevTexture
 
 	// use copy program
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
-	gl.BindVertexArray(self.vao)
+	gl.BindVertexArray(self.bo.VAO())
 	self.prevTexture.Activate(gl.TEXTURE0)
 
 	self.outputShaders.Current().Use().
 		Uniform1i("index", *self.gradientIndex.Current()).
 		Uniform1i("state", 0).
-		Uniform2f("scale", float32(width), float32(height))
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+		Uniform2f("scale", float32(self.width), float32(self.height))
+	self.bo.Draw()
 }
 
 func (self *LifeProgram) Render(t float64) {
@@ -239,7 +241,7 @@ func (self *LifeProgram) Render(t float64) {
 		self.recolor()
 	default:
 		if self.paused {
-			gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+			self.bo.Draw()
 			return
 		}
 
@@ -262,9 +264,11 @@ func (self *LifeProgram) ScrollCallback(w *glfw.Window, xoff float64, yoff float
 }
 
 func (self *LifeProgram) ResizeCallback(w *glfw.Window, width int, height int) {
-	self.prevTexture.Resize(width, height)
-	self.nextTexture.Resize(width, height)
-	self.growthDecayTexture.Resize(width, height)
+	self.width, self.height = self.Window.GetFramebufferSize()
+
+	self.prevTexture.Resize(self.width, self.height)
+	self.nextTexture.Resize(self.width, self.height)
+	self.growthDecayTexture.Resize(self.width, self.height)
 }
 
 func (self *LifeProgram) KeyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {

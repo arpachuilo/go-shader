@@ -363,5 +363,5 @@ void main() {
     color, vec3(1.0, 0.2, 0.7)
   );
 
-	outputColor = vec4(color, 0.6);
+	outputColor = vec4(color, 1.0);
 }

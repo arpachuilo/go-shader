@@ -25,8 +25,9 @@ void main() {
   // tt.x = fract(tt.x);
   // tt.y += cos(u_time + rnd) * 10;
   // gl_Position = vec4(tt, 0, 1);
-  fragTexCoord = tt;
+  // fragTexCoord = tt;
 
-  gl_Position = vec4(vert,0,1);
-  // fragTexCoord = vertTexCoord;
+  gl_Position = vec4(vert, 0, 1);
+  fragTexCoord = vertTexCoord;
+  // fragTexCoord = vert;
 }

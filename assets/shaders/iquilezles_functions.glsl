@@ -1,3 +1,4 @@
+// useful little functions https://iquilezles.org/articles/functions/
 #version 410
 
 uniform vec2 u_resolution;
@@ -27,7 +28,6 @@ vec4 map(vec4 value, vec4 inMin, vec4 inMax, vec4 outMin, vec4 outMax) {
   return outMin + (outMax - outMin) * (value - inMin) / (inMax - inMin);
 }
 
-// useful little functions https://iquilezles.org/articles/functions/
 // Intro
 // When writing shader or during any procedural creation process
 //  (texturing, modeling, shading, animation...) you often find yourself

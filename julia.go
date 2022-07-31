@@ -31,7 +31,8 @@ type JuliaProgram struct {
 	mouseDelta *MouseDelta
 
 	// buffers
-	fbo, vao, vbo uint32
+	bo  BufferObject
+	fbo uint32
 }
 
 func NewJuliaProgram() Program {
@@ -50,10 +51,9 @@ func NewJuliaProgram() Program {
 	}
 }
 
-func (self *JuliaProgram) Load(window *glfw.Window, vao, vbo uint32) {
+func (self *JuliaProgram) Load(window *glfw.Window, bo BufferObject) {
 	self.Window = window
-	self.vao = vao
-	self.vbo = vbo
+	self.bo = bo
 	width, height := window.GetFramebufferSize()
 
 	img := *image.NewRGBA(image.Rect(0, 0, width, height))
@@ -62,19 +62,19 @@ func (self *JuliaProgram) Load(window *glfw.Window, vao, vbo uint32) {
 	self.fractalTexture = LoadTexture(&img)
 
 	// create compute shaders
-	self.fractalShader = MustCompileShader(VertexShader, JuliaShader)
+	self.fractalShader = MustCompileShader(VertexShader, JuliaShader, self.bo)
 
 	// create output shaders
 	self.outputShaders = *newCyclicArray([]Shader{
-		MustCompileShader(VertexShader, ViridisShader),
-		MustCompileShader(VertexShader, InfernoShader),
-		MustCompileShader(VertexShader, MagmaShader),
-		MustCompileShader(VertexShader, PlasmaShader),
-		MustCompileShader(VertexShader, CividisShader),
-		MustCompileShader(VertexShader, TurboShader),
-		MustCompileShader(VertexShader, SinebowShader),
-		MustCompileShader(VertexShader, RGBShader),
-		MustCompileShader(VertexShader, RGBAShader),
+		MustCompileShader(VertexShader, ViridisShader, self.bo),
+		MustCompileShader(VertexShader, InfernoShader, self.bo),
+		MustCompileShader(VertexShader, MagmaShader, self.bo),
+		MustCompileShader(VertexShader, PlasmaShader, self.bo),
+		MustCompileShader(VertexShader, CividisShader, self.bo),
+		MustCompileShader(VertexShader, TurboShader, self.bo),
+		MustCompileShader(VertexShader, SinebowShader, self.bo),
+		MustCompileShader(VertexShader, RGBShader, self.bo),
+		MustCompileShader(VertexShader, RGBAShader, self.bo),
 	})
 
 	// create framebuffers
@@ -91,7 +91,7 @@ func (self *JuliaProgram) Render(t float64) {
 	gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
 	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, self.fractalTexture.Handle, 0)
 
-	gl.BindVertexArray(self.vao)
+	gl.BindVertexArray(self.bo.VAO())
 	self.fractalTexture.Activate(gl.TEXTURE0)
 
 	self.fractalShader.Use().
@@ -100,18 +100,18 @@ func (self *JuliaProgram) Render(t float64) {
 		Uniform2f("offset", float32(self.ox), float32(self.oy)).
 		Uniform1f("zoom", float32(self.zoom)).
 		Uniform2f("scale", float32(width), float32(height))
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+	self.bo.Draw()
 
 	// use copy program
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
-	gl.BindVertexArray(self.vao)
+	gl.BindVertexArray(self.bo.VAO())
 	self.fractalTexture.Activate(gl.TEXTURE0)
 
 	self.outputShaders.Current().Use().
 		Uniform1i("index", 0).
 		Uniform1i("state", 0).
 		Uniform2f("scale", float32(width), float32(height))
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+	self.bo.Draw()
 }
 
 func (self *JuliaProgram) ZoomOut() {

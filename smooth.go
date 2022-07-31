@@ -73,11 +73,9 @@ type SmoothLifeProgram struct {
 	outputShaders cyclicArray[Shader]
 	gradientIndex cyclicArray[int32]
 
-	// fontmap
-	fontmap *Fontmap
-
 	// buffers
-	fbo, vao, vbo uint32
+	fbo uint32
+	bo  BufferObject
 }
 
 func NewSmoothLifeProgram() Program {
@@ -96,10 +94,9 @@ func NewSmoothLifeProgram() Program {
 	}
 }
 
-func (self *SmoothLifeProgram) Load(window *glfw.Window, vao, vbo uint32) {
+func (self *SmoothLifeProgram) Load(window *glfw.Window, bo BufferObject) {
 	self.Window = window
-	self.vao = vao
-	self.vbo = vbo
+	self.bo = bo
 	width, height := window.GetFramebufferSize()
 
 	// create textures
@@ -126,24 +123,22 @@ func (self *SmoothLifeProgram) Load(window *glfw.Window, vao, vbo uint32) {
 	self.textureC = LoadTexture(&img3)
 
 	// create compute shaders
-	self.smoothShader = MustCompileShader(VertexShader, SmoothShader)
-	self.gaussX = MustCompileShader(VertexShader, GaussXShader)
-	self.gaussY = MustCompileShader(VertexShader, GaussYShader)
+	self.smoothShader = MustCompileShader(VertexShader, SmoothShader, self.bo)
+	self.gaussX = MustCompileShader(VertexShader, GaussXShader, self.bo)
+	self.gaussY = MustCompileShader(VertexShader, GaussYShader, self.bo)
 
 	// create output shaders
 	self.outputShaders = *newCyclicArray([]Shader{
-		MustCompileShader(VertexShader, ViridisShader),
-		MustCompileShader(VertexShader, InfernoShader),
-		MustCompileShader(VertexShader, MagmaShader),
-		MustCompileShader(VertexShader, PlasmaShader),
-		MustCompileShader(VertexShader, CividisShader),
-		MustCompileShader(VertexShader, TurboShader),
-		MustCompileShader(VertexShader, SinebowShader),
-		MustCompileShader(VertexShader, RGBShader),
-		MustCompileShader(VertexShader, RGBAShader),
+		MustCompileShader(VertexShader, ViridisShader, self.bo),
+		MustCompileShader(VertexShader, InfernoShader, self.bo),
+		MustCompileShader(VertexShader, MagmaShader, self.bo),
+		MustCompileShader(VertexShader, PlasmaShader, self.bo),
+		MustCompileShader(VertexShader, CividisShader, self.bo),
+		MustCompileShader(VertexShader, TurboShader, self.bo),
+		MustCompileShader(VertexShader, SinebowShader, self.bo),
+		MustCompileShader(VertexShader, RGBShader, self.bo),
+		MustCompileShader(VertexShader, RGBAShader, self.bo),
 	})
-
-	self.fontmap = MustLoadFont(self.vbo, self.vao)
 
 	// create framebuffers
 	gl.GenFramebuffers(1, &self.fbo)
@@ -156,14 +151,14 @@ func (self *SmoothLifeProgram) recolor() {
 	width, height := self.Window.GetFramebufferSize()
 	// use copy program
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
-	gl.BindVertexArray(self.vao)
+	gl.BindVertexArray(self.bo.VAO())
 	self.textureA.Activate(gl.TEXTURE0)
 
 	self.outputShaders.Current().Use().
 		Uniform1i("index", *self.gradientIndex.Current()).
 		Uniform1i("state", 0).
 		Uniform2f("scale", float32(width), float32(height))
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+	self.bo.Draw()
 }
 
 func (self *SmoothLifeProgram) smooth(t float64) {
@@ -176,7 +171,7 @@ func (self *SmoothLifeProgram) smooth(t float64) {
 	gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
 	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, self.textureA.Handle, 0)
 
-	gl.BindVertexArray(self.vao)
+	gl.BindVertexArray(self.bo.VAO())
 	self.textureA.Activate(gl.TEXTURE0)
 	self.textureC.Activate(gl.TEXTURE1)
 
@@ -189,13 +184,13 @@ func (self *SmoothLifeProgram) smooth(t float64) {
 		Uniform1f("time", float32(t)).
 		Uniform2f("scale", float32(width), float32(height)).
 		Uniform4f("mouse", float32(mx), float32(height)-float32(my), float32(mb1), float32(mb2))
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+	self.bo.Draw()
 
 	// use gauss x
 	gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
 	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, self.textureB.Handle, 0)
 
-	gl.BindVertexArray(self.vao)
+	gl.BindVertexArray(self.bo.VAO())
 	self.textureA.Activate(gl.TEXTURE0)
 
 	self.gaussX.Use().
@@ -206,13 +201,13 @@ func (self *SmoothLifeProgram) smooth(t float64) {
 		Uniform1f("time", float32(t)).
 		Uniform2f("scale", float32(width), float32(height)).
 		Uniform2f("mouse", float32(mx), float32(height)-float32(my))
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+	self.bo.Draw()
 
 	// use gauss y
 	gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
 	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, self.textureC.Handle, 0)
 
-	gl.BindVertexArray(self.vao)
+	gl.BindVertexArray(self.bo.VAO())
 	self.textureB.Activate(gl.TEXTURE0)
 
 	self.gaussY.Use().
@@ -223,18 +218,18 @@ func (self *SmoothLifeProgram) smooth(t float64) {
 		Uniform1f("time", float32(t)).
 		Uniform2f("scale", float32(width), float32(height)).
 		Uniform2f("mouse", float32(mx), float32(height)-float32(my))
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+	self.bo.Draw()
 
 	// use copy program
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
-	gl.BindVertexArray(self.vao)
+	gl.BindVertexArray(self.bo.VAO())
 	self.textureA.Activate(gl.TEXTURE0)
 
 	self.outputShaders.Current().Use().
 		Uniform1i("index", *self.gradientIndex.Current()).
 		Uniform1i("state", 0).
 		Uniform2f("scale", float32(width), float32(height))
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+	self.bo.Draw()
 }
 
 func (self *SmoothLifeProgram) Render(t float64) {
@@ -243,7 +238,7 @@ func (self *SmoothLifeProgram) Render(t float64) {
 		self.recolor()
 	default:
 		if self.paused {
-			gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+			self.bo.Draw()
 			return
 		}
 

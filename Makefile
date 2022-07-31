@@ -27,6 +27,7 @@ PLUG_FILES=\
 			texture.go\
 			pong.go\
 			vector.go\
+			object.go
 
 WINDOW_FILE=$(shell stat -f window_`go env GOOS`.go || stat -f window_unsupported.go)
 MAIN_FILES=\
