@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"math"
@@ -8,7 +9,30 @@ import (
 
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
+
+	. "gogl"
+	. "gogl/arrayutil"
+	. "gogl/assets"
+
+	_ "embed"
 )
+
+var BuildDate = ""
+
+func HotRender(kill <-chan bool, window *glfw.Window) {
+	fmt.Println(BuildDate)
+	program := NewSmoothLifeProgram()
+
+	NewRenderer(window, program).Run(kill)
+}
+
+//go:embed smooth_out.glsl
+var SmoothOutputShader string
+
+//go:embed smooth.glsl
+var SmoothShader string
+
+var RecolorCmd = "recolor"
 
 type SmoothLifeRules struct {
 	OR float32
@@ -70,8 +94,8 @@ type SmoothLifeProgram struct {
 
 	// output shaders
 	// outputShader Shader
-	outputShaders cyclicArray[Shader]
-	gradientIndex cyclicArray[int32]
+	outputShaders CyclicArray[Shader]
+	gradientIndex CyclicArray[int32]
 
 	// buffers
 	fbo uint32
@@ -90,13 +114,13 @@ func NewSmoothLifeProgram() Program {
 		cursorSize: 0.025,
 
 		cmds:          cmds,
-		gradientIndex: *newCyclicArray([]int32{0, 1, 2, 3}),
+		gradientIndex: *NewCyclicArray([]int32{0, 1, 2, 3}),
 	}
 }
 
-func (self *SmoothLifeProgram) Load(window *glfw.Window, bo BufferObject) {
+func (self *SmoothLifeProgram) Load(window *glfw.Window) {
 	self.Window = window
-	self.bo = bo
+	self.bo = NewVBuffer(QuadVertices, 2, 4)
 	width, height := window.GetFramebufferSize()
 
 	// create textures
@@ -128,7 +152,7 @@ func (self *SmoothLifeProgram) Load(window *glfw.Window, bo BufferObject) {
 	self.gaussY = MustCompileShader(VertexShader, GaussYShader, self.bo)
 
 	// create output shaders
-	self.outputShaders = *newCyclicArray([]Shader{
+	self.outputShaders = *NewCyclicArray([]Shader{
 		MustCompileShader(VertexShader, ViridisShader, self.bo),
 		MustCompileShader(VertexShader, InfernoShader, self.bo),
 		MustCompileShader(VertexShader, MagmaShader, self.bo),

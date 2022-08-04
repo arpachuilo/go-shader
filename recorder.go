@@ -1,17 +1,21 @@
-package main
+package engine
 
 import (
 	"bytes"
 	"fmt"
 	"image"
+	"image/color"
+	"image/gif"
 	"image/jpeg"
 	"os"
 	"time"
 
+	"github.com/ericpauley/go-quantize/quantize"
 	"github.com/gen2brain/beeep"
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
 	"github.com/icza/mjpeg"
+	"golang.org/x/image/draw"
 )
 
 type Recorder struct {
@@ -57,10 +61,12 @@ func (self *Recorder) End() {
 	self.On = false
 	self.endTime = time.Now()
 	beeep.Notify("Video Recording Finished", "Please wait before closing while your video is encoded", "")
+
+	// create video
 	go func(r *Recorder) {
 
 		// create sub-folders
-		subFolder := "cap"
+		subFolder := "videos"
 		folder := fmt.Sprintf("screencaptures/%v/", subFolder)
 		if _, err := os.Stat(folder); os.IsNotExist(err) {
 			os.MkdirAll(folder, 0700)
@@ -92,12 +98,70 @@ func (self *Recorder) End() {
 				return
 			}
 		}
+
 		fmt.Println("video saved")
 		beeep.Notify("Video Recording Saved!", name, "")
 		err = os.Remove(name + ".idx_")
 		if err != nil {
 			fmt.Println(err)
 			return
+		}
+	}(self)
+
+	// create gif
+	go func(r *Recorder) {
+		// create gif
+		var delays []int
+		var disposal []byte
+		var images = make([]*image.Paletted, 0)
+
+		var p = make([]color.Color, 0, 256)
+		var q = quantize.MedianCutQuantizer{}
+
+		for _, img := range r.frames {
+			p = q.Quantize(p, img)
+			p[0] = color.RGBA{0, 0, 0, 0}
+
+			b := img.Bounds()
+			frame := image.NewPaletted(b, p)
+			draw.Draw(frame, frame.Rect, img, b.Min, draw.Over)
+			images = append(images, frame)
+			delays = append(delays, 2)
+			d := gif.DisposalBackground
+			disposal = append(disposal, byte(d))
+		}
+
+		out := &gif.GIF{
+			Image:           images,
+			Delay:           delays,
+			Disposal:        disposal,
+			BackgroundIndex: byte(0),
+		}
+
+		// create sub-folders
+		subFolder := "gifs"
+		folder := fmt.Sprintf("screencaptures/%v/", subFolder)
+		if _, err := os.Stat(folder); os.IsNotExist(err) {
+			os.MkdirAll(folder, 0700)
+		}
+
+		// create file
+		name := folder + time.Now().Format("20060102150405") + ".gif"
+		f, err := os.Create(name)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		// encode gif
+		fmt.Println("Saving GIF", name)
+		gif.EncodeAll(f, out)
+
+		// cleanup
+		beeep.Notify("GIF Saved!", name, "")
+		fmt.Println("gif saved")
+		if err = f.Close(); err != nil {
+			fmt.Println(err)
 		}
 	}(self)
 }

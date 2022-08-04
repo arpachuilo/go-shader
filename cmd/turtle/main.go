@@ -1,33 +1,50 @@
 package main
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"math"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
+	"github.com/go-gl/mathgl/mgl64"
+
+	. "gogl"
+	. "gogl/arrayutil"
+	. "gogl/assets"
+	. "gogl/mathutil"
+
+	_ "embed"
 )
+
+var BuildDate = ""
+
+func HotRender(kill <-chan bool, window *glfw.Window) {
+	fmt.Println(BuildDate)
+	program := NewTurtleProgram()
+
+	NewRenderer(window, program).Run(kill)
+}
+
+var RecolorCmd = "recolor"
+
+//go:embed turtle.glsl
+var TurtleShader string
 
 type Turtle struct {
 	Down     int32
-	Heading  Vector2
-	Position Vector2
+	Heading  mgl64.Vec2
+	Position mgl64.Vec2
 	Speed    float64
 }
 
 func NewTurtle() *Turtle {
 	return &Turtle{
-		Down: 1,
-		Position: Vector2{
-			X: 0,
-			Y: 0,
-		},
-		Heading: Vector2{
-			X: 0,
-			Y: -1,
-		},
-		Speed: 1,
+		Down:     1,
+		Position: mgl64.Vec2{0, 0},
+		Heading:  mgl64.Vec2{0, -1},
+		Speed:    1,
 	}
 }
 
@@ -47,12 +64,12 @@ func (self *Turtle) PenDown() {
 	self.Down = 0
 }
 
-func (self *Turtle) Turn(degrees float64) Vector2 {
-	self.Heading = self.Heading.Turn(degrees)
+func (self *Turtle) Turn(degrees float64) mgl64.Vec2 {
+	self.Heading = TurnVec2(self.Heading, degrees)
 	return self.Heading
 }
 
-func (self *Turtle) Advance() (Vector2, Vector2) {
+func (self *Turtle) Advance() (mgl64.Vec2, mgl64.Vec2) {
 	previous := self.Position
 	self.Position = previous.Add(self.Heading.Mul(self.Speed))
 	return previous, self.Position
@@ -77,8 +94,8 @@ type TurtleProgram struct {
 	turtleShader Shader
 
 	// output shaders
-	outputShaders cyclicArray[Shader]
-	gradientIndex cyclicArray[int32]
+	outputShaders CyclicArray[Shader]
+	gradientIndex CyclicArray[int32]
 
 	// buffers
 	fbo uint32
@@ -97,13 +114,13 @@ func NewTurtleProgram() Program {
 		cursorSize: 0.025,
 
 		cmds:          cmds,
-		gradientIndex: *newCyclicArray([]int32{0, 1, 2, 3}),
+		gradientIndex: *NewCyclicArray([]int32{0, 1, 2, 3}),
 	}
 }
 
-func (self *TurtleProgram) Load(window *glfw.Window, bo BufferObject) {
+func (self *TurtleProgram) Load(window *glfw.Window) {
 	self.Window = window
-	self.bo = bo
+	self.bo = NewVBuffer(QuadVertices, 2, 4)
 	self.width, self.height = window.GetFramebufferSize()
 
 	// create textures
@@ -129,7 +146,7 @@ func (self *TurtleProgram) Load(window *glfw.Window, bo BufferObject) {
 	self.turtleShader = MustCompileShader(VertexShader, TurtleShader, self.bo)
 
 	// create output shaders
-	self.outputShaders = *newCyclicArray([]Shader{
+	self.outputShaders = *NewCyclicArray([]Shader{
 		MustCompileShader(VertexShader, ViridisShader, self.bo),
 		MustCompileShader(VertexShader, InfernoShader, self.bo),
 		MustCompileShader(VertexShader, MagmaShader, self.bo),
@@ -152,7 +169,7 @@ func (self *TurtleProgram) Load(window *glfw.Window, bo BufferObject) {
 	distance := math.Min(float64(self.width), float64(self.height)) * 0.25
 	x := (float64(self.width) / 2.0)
 	y := (float64(self.height) / 2.0) + (distance / 4.0)
-	self.turtle.Position = Vector2{x, y}
+	self.turtle.Position = mgl64.Vec2{x, y}
 	self.turtle.Turn(100)
 }
 
@@ -205,8 +222,8 @@ func (self *TurtleProgram) run(t float64) {
 		Uniform1i("state", 0).
 		Uniform1i("d", self.turtle.Down).
 		Uniform1f("w", float32(w)).
-		Uniform2f("a", float32(prev.X), float32(prev.Y)).
-		Uniform2f("b", float32(next.X), float32(next.Y)).
+		Uniform2f("a", float32(prev[0]), float32(prev[1])).
+		Uniform2f("b", float32(next[0]), float32(next[1])).
 		Uniform1f("time", float32(t)).
 		Uniform2f("scale", float32(self.width), float32(self.height)).
 		Uniform2f("mouse", float32(mx), float32(self.height)-float32(my))

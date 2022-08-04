@@ -1,4 +1,4 @@
-package main
+package engine
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
+	"github.com/go-gl/mathgl/mgl32"
 )
 
 type Shader uint32
@@ -64,12 +65,20 @@ func CompileShader(vertexShaderSource, fragmentShaderSource string, bo BufferObj
 	// bind vertex coordinates
 	vertCoords := uint32(gl.GetAttribLocation(program, gl.Str("vert\x00")))
 	gl.EnableVertexAttribArray(vertCoords)
-	gl.VertexAttribPointerWithOffset(vertCoords, 2, gl.FLOAT, false, bo.GetVertices().VertexSize(), 0)
+	gl.VertexAttribPointerWithOffset(
+		vertCoords, bo.GetSize(), gl.FLOAT, false,
+		bo.VertexSize(),
+		uintptr(bo.PosOffset()),
+	)
 
 	// bind texture coordinates
 	texCoords := uint32(gl.GetAttribLocation(program, gl.Str("vertTexCoord\x00")))
 	gl.EnableVertexAttribArray(texCoords)
-	gl.VertexAttribPointerWithOffset(texCoords, 2, gl.FLOAT, false, bo.GetVertices().VertexSize(), uintptr(bo.GetVertices().TexOffset()))
+	gl.VertexAttribPointerWithOffset(
+		texCoords, bo.GetSize(), gl.FLOAT, false,
+		bo.VertexSize(),
+		uintptr(bo.TexOffset()),
+	)
 
 	return Shader(program), nil
 }
@@ -276,5 +285,12 @@ func (self Shader) Uniform4iv(name string, values []int32) Shader {
 	attr := fmt.Sprintf("%v\x00", name)
 	location := gl.GetUniformLocation(uint32(self), gl.Str(attr))
 	gl.ProgramUniform4iv(uint32(self), location, int32(len(values)), &values[0])
+	return self
+}
+
+func (self Shader) UniformMatrix4fv(name string, values *mgl32.Mat4) Shader {
+	attr := fmt.Sprintf("%v\x00", name)
+	location := gl.GetUniformLocation(uint32(self), gl.Str(attr))
+	gl.ProgramUniformMatrix4fv(uint32(self), location, 1, false, &values[0])
 	return self
 }

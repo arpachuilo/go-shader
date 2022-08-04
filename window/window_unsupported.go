@@ -1,7 +1,7 @@
 //go:build !darwin
 // +build !darwin
 
-package main
+package window
 
 import "github.com/go-gl/glfw/v3.3/glfw"
 

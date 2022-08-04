@@ -1,23 +1,41 @@
 package main
 
 import (
+	"fmt"
 	"image"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
+
+	. "gogl"
+	. "gogl/arrayutil"
+	. "gogl/assets"
+
+	_ "embed"
 )
 
-type JuliaProgram struct {
+var BuildDate = ""
+
+func HotRender(kill <-chan bool, window *glfw.Window) {
+	fmt.Println(BuildDate)
+	program := NewMandelbrotProgram()
+
+	NewRenderer(window, program).Run(kill)
+}
+
+//go:embed mandelbrot.glsl
+var MandelbrotShader string
+
+type MandelbrotProgram struct {
 	Window *glfw.Window
 
 	// state
+	paused     bool
 	iterations int32
 	zoom       float64
-	cx, cy     float64
-	ox, oy     float64
+	x, y       float64
 
-	complexMode bool
-	zoomFactor  float64
+	zoomFactor float64
 
 	// textures
 	fractalTexture *Texture
@@ -26,34 +44,32 @@ type JuliaProgram struct {
 	fractalShader Shader
 
 	// output shaders
-	outputShaders cyclicArray[Shader]
+	outputShaders CyclicArray[Shader]
 
 	mouseDelta *MouseDelta
 
 	// buffers
-	bo  BufferObject
 	fbo uint32
+	bo  BufferObject
 }
 
-func NewJuliaProgram() Program {
-	return &JuliaProgram{
-		iterations: 255,
-		cx:         -0.7,
-		cy:         0.27015,
-		ox:         0.0,
-		oy:         0.0,
+func NewMandelbrotProgram() Program {
+	return &MandelbrotProgram{
+		paused:     false,
+		iterations: 1000,
+		x:          -0.51,
+		y:          0.0,
 		zoom:       1.0,
 
-		complexMode: true,
-		zoomFactor:  0.01,
+		zoomFactor: 0.01,
 
 		mouseDelta: NewMouseDelta(.0001),
 	}
 }
 
-func (self *JuliaProgram) Load(window *glfw.Window, bo BufferObject) {
+func (self *MandelbrotProgram) Load(window *glfw.Window) {
 	self.Window = window
-	self.bo = bo
+	self.bo = NewVBuffer(QuadVertices, 2, 4)
 	width, height := window.GetFramebufferSize()
 
 	img := *image.NewRGBA(image.Rect(0, 0, width, height))
@@ -62,10 +78,10 @@ func (self *JuliaProgram) Load(window *glfw.Window, bo BufferObject) {
 	self.fractalTexture = LoadTexture(&img)
 
 	// create compute shaders
-	self.fractalShader = MustCompileShader(VertexShader, JuliaShader, self.bo)
+	self.fractalShader = MustCompileShader(VertexShader, MandelbrotShader, self.bo)
 
 	// create output shaders
-	self.outputShaders = *newCyclicArray([]Shader{
+	self.outputShaders = *NewCyclicArray([]Shader{
 		MustCompileShader(VertexShader, ViridisShader, self.bo),
 		MustCompileShader(VertexShader, InfernoShader, self.bo),
 		MustCompileShader(VertexShader, MagmaShader, self.bo),
@@ -85,7 +101,11 @@ func (self *JuliaProgram) Load(window *glfw.Window, bo BufferObject) {
 	self.Window.SetCursorPosCallback(self.CursorPosCallback)
 }
 
-func (self *JuliaProgram) Render(t float64) {
+func (self *MandelbrotProgram) Render(t float64) {
+	if self.paused {
+		return
+	}
+
 	width, height := self.Window.GetFramebufferSize()
 
 	gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
@@ -96,8 +116,7 @@ func (self *JuliaProgram) Render(t float64) {
 
 	self.fractalShader.Use().
 		Uniform1i("maxIterations", self.iterations).
-		Uniform2f("focus", float32(self.cx), float32(self.cy)).
-		Uniform2f("offset", float32(self.ox), float32(self.oy)).
+		Uniform2f("focus", float32(self.x), float32(self.y)).
 		Uniform1f("zoom", float32(self.zoom)).
 		Uniform2f("scale", float32(width), float32(height))
 	self.bo.Draw()
@@ -114,32 +133,26 @@ func (self *JuliaProgram) Render(t float64) {
 	self.bo.Draw()
 }
 
-func (self *JuliaProgram) ZoomOut() {
+func (self *MandelbrotProgram) ZoomOut() {
 	self.zoom -= self.zoomFactor
 }
 
-func (self *JuliaProgram) ZoomIn() {
+func (self *MandelbrotProgram) ZoomIn() {
 	self.zoom += self.zoomFactor
 }
 
-func (self *JuliaProgram) ResizeCallback(w *glfw.Window, width int, height int) {
+func (self *MandelbrotProgram) ResizeCallback(w *glfw.Window, width int, height int) {
 	self.fractalTexture.Resize(width, height)
 }
 
-func (self *JuliaProgram) CursorPosCallback(w *glfw.Window, x, y float64) {
+func (self *MandelbrotProgram) CursorPosCallback(w *glfw.Window, x, y float64) {
 	// pan screen
 	dx, dy := self.mouseDelta.Delta(x, y)
-
-	if self.complexMode {
-		self.cx += dx / self.zoom
-		self.cy -= dy / self.zoom
-	} else {
-		self.ox += dx / self.zoom
-		self.oy -= dy / self.zoom
-	}
+	self.x += dx / self.zoom
+	self.y += dy / self.zoom
 }
 
-func (self *JuliaProgram) ScrollCallback(w *glfw.Window, xoff float64, yoff float64) {
+func (self *MandelbrotProgram) ScrollCallback(w *glfw.Window, xoff float64, yoff float64) {
 	if yoff > 0 {
 		self.ZoomIn()
 		self.zoom += self.zoomFactor
@@ -148,7 +161,11 @@ func (self *JuliaProgram) ScrollCallback(w *glfw.Window, xoff float64, yoff floa
 	}
 }
 
-func (self *JuliaProgram) KeyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+func (self *MandelbrotProgram) KeyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+	if key == glfw.KeySpace && action == glfw.Release {
+		self.paused = !self.paused
+	}
+
 	if key == glfw.KeyEqual {
 		self.iterations = self.iterations + 10
 	}
@@ -167,19 +184,6 @@ func (self *JuliaProgram) KeyCallback(w *glfw.Window, key glfw.Key, scancode int
 
 		if key == glfw.KeyK {
 			self.outputShaders.Next()
-		}
-
-		if key == glfw.KeySpace {
-			self.complexMode = !self.complexMode
-		}
-
-		if key == glfw.KeyR {
-			self.ox = 0.0
-			self.oy = 0.0
-			self.zoom = 1.0
-			self.iterations = 255
-			self.cx = -0.7
-			self.cy = 0.27015
 		}
 	}
 }

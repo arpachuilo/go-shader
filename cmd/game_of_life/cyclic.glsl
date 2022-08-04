@@ -4,16 +4,16 @@ uniform float stages;
 uniform sampler2D state;
 
 uniform float cursorSize;
-uniform float time;
-uniform vec2 scale;
-uniform vec2 mouse;
+uniform float u_time;
+uniform vec2 u_resolution;
+uniform vec2 u_mouse;
 
 in vec2 fragTexCoord;
 
 out vec4 outputColor;
 
 vec4 get(vec2 coord) {
-    return texture(state, vec2(gl_FragCoord.xy + coord) / scale, 0);
+  return texture(state, vec2(gl_FragCoord.xy + coord) / u_resolution, 0);
 }
 
 float random (vec2 st) {
@@ -51,15 +51,15 @@ vec4 op(vec4 current, vec4 next, ivec4 neighbors) {
 
 void main() {
   vec2 pos = gl_FragCoord.xy;
-  if (mouse.x < (0.01 * scale.x) && time > 1) {
+  if (u_mouse.x < (0.01 * u_resolution.x) && u_time > 1) {
     outputColor = vec4(0.0);
     return;
-  } else if (mouse.x > (0.99 * scale.x) || length(pos-mouse) < (cursorSize * scale.x)) {
+  } else if (u_mouse.x > (0.99 * u_resolution.x) || length(pos-u_mouse) < (cursorSize * u_resolution.x)) {
     outputColor = vec4(
-      random(pos / scale),
-      random(mouse / scale),
-      random(vec2(sin(time), sin(time)) / scale),
-      random(pos / scale)
+      random(pos / u_resolution),
+      random(u_mouse / u_resolution),
+      random(vec2(sin(u_time), sin(u_time)) / u_resolution),
+      random(vec2(cos(u_time), cos(u_time)) / u_resolution)
     );
     return;
   }

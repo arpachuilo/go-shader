@@ -1,7 +1,7 @@
 //go:build darwin
 // +build darwin
 
-package main
+package window
 
 /*
 #cgo CFLAGS: -x objective-c

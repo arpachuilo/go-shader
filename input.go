@@ -1,4 +1,4 @@
-package main
+package engine
 
 import (
 	"github.com/go-gl/glfw/v3.3/glfw"
@@ -91,27 +91,29 @@ type MouseDelta struct {
 
 func NewMouseDelta(scale float64) *MouseDelta {
 	return &MouseDelta{
-		previousX: -1,
-		previousY: -1,
+		previousX: 0,
+		previousY: 0,
+		Scale:     scale,
+	}
+}
+
+func NewMouseDeltaWithPrevious(scale, previousX, previousY float64) *MouseDelta {
+	return &MouseDelta{
+		previousX: previousX,
+		previousY: previousY,
 		Scale:     scale,
 	}
 }
 
 func (self *MouseDelta) DeltaX(currentX float64) float64 {
 	deltaX := currentX - self.previousX
-	if self.previousX == -1 {
-		deltaX = 0
-	}
 
 	self.previousX = currentX
 	return (deltaX) * self.Scale
 }
 
 func (self *MouseDelta) DeltaY(currentY float64) float64 {
-	deltaY := currentY - self.previousY
-	if self.previousY == -1 {
-		deltaY = 0
-	}
+	deltaY := self.previousY - currentY
 
 	self.previousY = currentY
 	return (deltaY) * self.Scale

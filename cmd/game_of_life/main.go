@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"math"
@@ -8,7 +9,31 @@ import (
 
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
+
+	. "gogl"
+	. "gogl/arrayutil"
+	. "gogl/assets"
+
+	_ "embed"
 )
+
+var BuildDate = ""
+
+func HotRender(kill <-chan bool, window *glfw.Window) {
+	fmt.Println(BuildDate)
+	program := NewLifeProgram()
+
+	NewRenderer(window, program).Run(kill)
+}
+
+//go:embed cyclic.glsl
+var CyclicShader string
+
+//go:embed life.glsl
+var GOLShader string
+
+//go:embed growth_decay.glsl
+var GainShader string
 
 var RecolorCmd = "recolor"
 
@@ -45,8 +70,8 @@ type LifeProgram struct {
 	growthDecayShader Shader
 
 	// output shaders
-	outputShaders cyclicArray[Shader]
-	gradientIndex cyclicArray[int32]
+	outputShaders CyclicArray[Shader]
+	gradientIndex CyclicArray[int32]
 
 	// buffers
 	fbo uint32
@@ -70,13 +95,13 @@ func NewLifeProgram() Program {
 		cursorSize: 0.025,
 
 		cmds:          cmds,
-		gradientIndex: *newCyclicArray([]int32{0, 1, 2, 3}),
+		gradientIndex: *NewCyclicArray([]int32{0, 1, 2, 3}),
 	}
 }
 
-func (self *LifeProgram) Load(window *glfw.Window, bo BufferObject) {
+func (self *LifeProgram) Load(window *glfw.Window) {
 	self.Window = window
-	self.bo = bo
+	self.bo = NewVBuffer(QuadVertices, 2, 4)
 	self.width, self.height = window.GetFramebufferSize()
 
 	// create textures
@@ -108,7 +133,7 @@ func (self *LifeProgram) Load(window *glfw.Window, bo BufferObject) {
 	self.growthDecayShader = MustCompileShader(VertexShader, GainShader, self.bo)
 
 	// create output shaders
-	self.outputShaders = *newCyclicArray([]Shader{
+	self.outputShaders = *NewCyclicArray([]Shader{
 		MustCompileShader(VertexShader, ViridisShader, self.bo),
 		MustCompileShader(VertexShader, InfernoShader, self.bo),
 		MustCompileShader(VertexShader, MagmaShader, self.bo),
@@ -163,9 +188,6 @@ func (self *LifeProgram) life(t float64) {
 		Uniform1iv("b", self.birth).
 		Uniform1i("state", 0).
 		Uniform1f("cursorSize", float32(self.cursorSize)).
-		// Uniform1f("time", float32(t)).
-		// Uniform2f("scale", float32(width), float32(height)).
-		// Uniform2f("mouse", float32(mx), float32(height)-float32(my)),
 		Uniform1i("u_frame", int32(self.frame)).
 		Uniform1f("u_time", float32(t)).
 		Uniform2f("u_mouse", float32(mx), float32(self.height)-float32(my)).
@@ -186,7 +208,10 @@ func (self *LifeProgram) life(t float64) {
 	self.growthDecayShader.Use().
 		Uniform1i("state", 0).
 		Uniform1i("self", 1).
-		Uniform2f("scale", float32(self.width), float32(self.height))
+		Uniform1i("u_frame", int32(self.frame)).
+		Uniform1f("u_time", float32(t)).
+		Uniform2f("u_mouse", float32(mx), float32(self.height)-float32(my)).
+		Uniform2f("u_resolution", float32(self.width), float32(self.height))
 	self.bo.Draw()
 
 	// use copy program
@@ -197,7 +222,11 @@ func (self *LifeProgram) life(t float64) {
 	self.outputShaders.Current().Use().
 		Uniform1i("index", *self.gradientIndex.Current()).
 		Uniform1i("state", 0).
-		Uniform2f("scale", float32(self.width), float32(self.height))
+		Uniform2f("scale", float32(self.width), float32(self.height)).
+		Uniform1i("u_frame", int32(self.frame)).
+		Uniform1f("u_time", float32(t)).
+		Uniform2f("u_mouse", float32(mx), float32(self.height)-float32(my)).
+		Uniform2f("u_resolution", float32(self.width), float32(self.height))
 	self.bo.Draw()
 }
 
@@ -215,9 +244,10 @@ func (self *LifeProgram) cyclic(t float64) {
 		Uniform1f("stages", 16.0).
 		Uniform1i("state", 0).
 		Uniform1f("cursorSize", float32(self.cursorSize)).
-		Uniform1f("time", float32(t)).
-		Uniform2f("scale", float32(self.width), float32(self.height)).
-		Uniform2f("mouse", float32(mx), float32(self.height)-float32(my))
+		Uniform1i("u_frame", int32(self.frame)).
+		Uniform1f("u_time", float32(t)).
+		Uniform2f("u_mouse", float32(mx), float32(self.height)-float32(my)).
+		Uniform2f("u_resolution", float32(self.width), float32(self.height))
 	self.bo.Draw()
 
 	// swap texture

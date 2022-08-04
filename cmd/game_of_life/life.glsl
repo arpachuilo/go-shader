@@ -22,12 +22,6 @@ float random (vec2 st) {
 
 ivec4 alive(vec4 cell) {
   return ivec4(step(0.5, cell));
-  // return ivec4(
-  //   cell.r > 0.5 ? 1 : 0,
-  //   cell.g > 0.5 ? 1 : 0,
-  //   cell.b > 0.5 ? 1 : 0,
-  //   cell.a > 0.5 ? 1 : 0
-  // );
 }
 
 float op(float c, int n) {
@@ -42,7 +36,7 @@ float op(float c, int n) {
     n == b[7] || 
     n == b[8]
   ) {
-      return 1.0;
+    return 1.0;
   } else if (
     n == s[0] || 
     n == s[1] || 
@@ -54,7 +48,7 @@ float op(float c, int n) {
     n == s[7] || 
     n == s[8]
   ) {
-      return c;
+    return c;
   }
 
   return 0.0;
@@ -75,16 +69,16 @@ void main() {
     return;
   }
 
-
   // sum each channel alive
-  ivec4 sum = alive(get(vec2(-1, -1))) +
-              alive(get(vec2(-1,  0))) +
-              alive(get(vec2(-1,  1))) +
-              alive(get(vec2( 0, -1))) +
-              alive(get(vec2( 0,  1))) +
-              alive(get(vec2( 1, -1))) +
-              alive(get(vec2( 1,  0))) +
-              alive(get(vec2( 1,  1)));
+  float oo = 2.0; // makes cool effect this way
+  ivec4 sum = alive(get(vec2(-oo, -oo))) +
+              alive(get(vec2(-oo,  0))) +
+              alive(get(vec2(-oo,  oo))) +
+              alive(get(vec2( 0, -oo))) +
+              alive(get(vec2( 0,  oo))) +
+              alive(get(vec2( oo, -oo))) +
+              alive(get(vec2( oo,  0))) +
+              alive(get(vec2( oo,  oo)));
 
   vec4 current = get(vec2(0, 0));
   outputColor = vec4(

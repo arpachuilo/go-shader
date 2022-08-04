@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"math"
@@ -8,11 +9,33 @@ import (
 
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
+	"github.com/go-gl/mathgl/mgl64"
+
+	. "gogl"
+	. "gogl/arrayutil"
+	. "gogl/assets"
+	. "gogl/mathutil"
+
+	_ "embed"
 )
 
+var BuildDate = ""
+
+func HotRender(kill <-chan bool, window *glfw.Window) {
+	fmt.Println(BuildDate)
+	program := NewPongProgram()
+
+	NewRenderer(window, program).Run(kill)
+}
+
+var RecolorCmd = "recolor"
+
+//go:embed pong.glsl
+var PongShader string
+
 type Pong struct {
-	Heading  Vector2
-	Position Vector2
+	Heading  mgl64.Vec2
+	Position mgl64.Vec2
 
 	Speed float64
 	Size  float64
@@ -24,45 +47,39 @@ type Pong struct {
 // TODO: Look into storing this inside texture for use with sampler
 func NewPong() *Pong {
 	return &Pong{
-		Position: Vector2{
-			X: rand.Float64(),
-			Y: rand.Float64(),
-		},
-		Heading: Vector2{
-			X: -1.0 + rand.Float64()*2,
-			Y: -1.0 + rand.Float64()*2,
-		}.Normalize(),
-		Speed: rand.Float64()*10 + 1.0,
-		Size:  rand.Float64()*12 + 3,
+		Position: mgl64.Vec2{rand.Float64(), rand.Float64()},
+		Heading:  mgl64.Vec2{-1.0 + rand.Float64()*2, -1.0 + rand.Float64()*2}.Normalize(),
+		Speed:    rand.Float64()*10 + 1.0,
+		Size:     rand.Float64()*12 + 3,
 	}
 }
 
 func (self *Pong) Resize(width, height int) {
-	self.Position.X = rand.Float64() * float64(width)
-	self.Position.Y = rand.Float64() * float64(height)
+	self.Position[0] = rand.Float64() * float64(width)
+	self.Position[1] = rand.Float64() * float64(height)
 	self.Width = width
 	self.Height = height
 }
 
-func (self *Pong) Turn(degrees float64) Vector2 {
-	self.Heading = self.Heading.Turn(degrees)
+func (self *Pong) Turn(degrees float64) mgl64.Vec2 {
+	self.Heading = TurnVec2(self.Heading, degrees)
 	return self.Heading
 }
 
 func (self *Pong) Advance() {
 	next := self.Position.Add(self.Heading.Mul(self.Speed))
 
-	if next.X <= self.Size {
-		self.Heading = self.Heading.Reflect(Vector3Right).Normalize()
+	if next[0] <= self.Size {
+		self.Heading = ReflectVec2(self.Heading, Vector3Right).Normalize()
 		next = self.Position.Add(self.Heading.Mul(self.Speed))
-	} else if next.X >= float64(self.Width)-self.Size {
-		self.Heading = self.Heading.Reflect(Vector3Left).Normalize()
+	} else if next[0] >= float64(self.Width)-self.Size {
+		self.Heading = ReflectVec2(self.Heading, Vector3Left).Normalize()
 		next = self.Position.Add(self.Heading.Mul(self.Speed))
-	} else if next.Y <= self.Size {
-		self.Heading = self.Heading.Reflect(Vector3Up).Normalize()
+	} else if next[1] <= self.Size {
+		self.Heading = ReflectVec2(self.Heading, Vector3Up).Normalize()
 		next = self.Position.Add(self.Heading.Mul(self.Speed))
-	} else if next.Y >= float64(self.Height)-self.Size {
-		self.Heading = self.Heading.Reflect(Vector3Down).Normalize()
+	} else if next[1] >= float64(self.Height)-self.Size {
+		self.Heading = ReflectVec2(self.Heading, Vector3Down).Normalize()
 		next = self.Position.Add(self.Heading.Mul(self.Speed))
 	}
 
@@ -87,8 +104,8 @@ type PongProgram struct {
 	pongShader Shader
 
 	// output shaders
-	outputShaders cyclicArray[Shader]
-	gradientIndex cyclicArray[int32]
+	outputShaders CyclicArray[Shader]
+	gradientIndex CyclicArray[int32]
 
 	// buffers
 	fbo uint32
@@ -112,13 +129,13 @@ func NewPongProgram() Program {
 		alpha:  0.0,
 
 		cmds:          cmds,
-		gradientIndex: *newCyclicArray([]int32{0, 1, 2, 3}),
+		gradientIndex: *NewCyclicArray([]int32{0, 1, 2, 3}),
 	}
 }
 
-func (self *PongProgram) Load(window *glfw.Window, bo BufferObject) {
+func (self *PongProgram) Load(window *glfw.Window) {
 	self.Window = window
-	self.bo = bo
+	self.bo = NewVBuffer(QuadVertices, 2, 4)
 	width, height := window.GetFramebufferSize()
 
 	// create textures
@@ -144,7 +161,7 @@ func (self *PongProgram) Load(window *glfw.Window, bo BufferObject) {
 	self.pongShader = MustCompileShader(VertexShader, PongShader, self.bo)
 
 	// create output shaders
-	self.outputShaders = *newCyclicArray([]Shader{
+	self.outputShaders = *NewCyclicArray([]Shader{
 		MustCompileShader(VertexShader, ViridisShader, self.bo),
 		MustCompileShader(VertexShader, InfernoShader, self.bo),
 		MustCompileShader(VertexShader, MagmaShader, self.bo),
@@ -200,8 +217,8 @@ func (self *PongProgram) run(t float64) {
 	pongs := make([]float32, 0)
 	for _, p := range self.pong {
 		sizes = append(sizes, float32(p.Size))
-		pongs = append(pongs, float32(p.Position.X))
-		pongs = append(pongs, float32(p.Position.Y))
+		pongs = append(pongs, float32(p.Position[0]))
+		pongs = append(pongs, float32(p.Position[1]))
 	}
 
 	self.pongShader.Use().

@@ -22,7 +22,7 @@ in vec2 fragTexCoord;
 out vec4 outputColor;
 
 void main() {
-    vec4 tex = texture(state, gl_FragCoord.xy  / scale, 0);
-    vec4 color = vec4(viridis(tex[index]), 1.0);
-    outputColor = vec4(color.rgb, 1.0 - color.a * alpha);
+  vec4 tex = texture(state, gl_FragCoord.xy/scale, 0);
+  vec4 color = vec4(viridis(tex[index]), 1.0);
+  outputColor = vec4(color.rgb, 1.0 - color.a * alpha);
 }

@@ -1,4 +1,4 @@
-package main
+package engine
 
 import (
 	"errors"
@@ -14,14 +14,25 @@ import (
 	"github.com/go-gl/glfw/v3.3/glfw"
 )
 
+var BuildDate = ""
+var HotProgram Program
+
+func HotRender(kill <-chan bool, window *glfw.Window) {
+	fmt.Println(BuildDate)
+
+	if HotProgram == nil {
+		panic("hot program not set")
+	}
+
+	NewRenderer(window, HotProgram).Run(kill)
+}
+
 var CaptureCmd = "capture"
 
 // Renderer handles running our programs
 type Renderer struct {
-	Program        Program
-	Window         *glfw.Window
-	wPosX, wPosY   int
-	wSizeX, wSizeY int
+	Program Program
+	Window  *glfw.Window
 
 	Wireframe         bool
 	Tick              *time.Ticker
@@ -39,7 +50,7 @@ type Renderer struct {
 }
 
 // NewRenderer Create new renderer
-func NewRenderer(window *glfw.Window) *Renderer {
+func NewRenderer(window *glfw.Window, program Program) *Renderer {
 	r := &Renderer{
 		Program: nil,
 		Window:  window,
@@ -53,45 +64,43 @@ func NewRenderer(window *glfw.Window) *Renderer {
 	r.KeyRegister = NewKeyRegister()
 	registrable.RegisterMethods[KeyCallbackRegistration](r)
 
-	return r
-}
-
-func (self *Renderer) Setup() {
 	// Initialize Glow
 	if err := gl.Init(); err != nil {
 		panic(err)
 	}
 
 	// get current resolution
-	self.Width, self.Height = self.Window.GetFramebufferSize()
+	r.Width, r.Height = r.Window.GetFramebufferSize()
 
 	// get refresh rate
-	self.RefreshRate = float64(glfw.GetPrimaryMonitor().GetVideoMode().RefreshRate)
-	self.Tick = time.NewTicker(time.Duration(1000/self.RefreshRate) * time.Millisecond)
+	r.RefreshRate = float64(glfw.GetPrimaryMonitor().GetVideoMode().RefreshRate)
+	r.Tick = time.NewTicker(time.Duration(1000/r.RefreshRate) * time.Millisecond)
 
 	// register key press channels
-	self.Cmds.Register(CaptureCmd)
+	r.Cmds.Register(CaptureCmd)
 
 	// print some info
 	version := gl.GoStr(gl.GetString(gl.VERSION))
 	fmt.Println("OpenGL version", version)
-	fmt.Println("Refresh rate", self.RefreshRate)
+	fmt.Println("Refresh rate", r.RefreshRate)
 
 	// register callbacks
-	self.Window.SetKeyCallback(self.KeyCallback)
-	self.Window.SetSizeCallback(self.ResizeCallback)
+	r.Window.SetKeyCallback(r.KeyCallback)
+	r.Window.SetSizeCallback(r.ResizeCallback)
 
-	self.bo = NewVIBuffer(C1Vertices, C1Indices, 48)
-	// self.bo = NewVIBuffer(C1Vertices, C1AltIndices, 36)
-	// self.bo = NewVBuffer(QuadVertices, 4)
+	// r.bo = NewVIBuffer(C1Vertices, C1Indices, 2, 48)
+	// r.bo = NewVIBuffer(C1Vertices, C1AltIndices, 2, 36)
+	// r.bo = NewVBuffer(QuadVertices, 2, 4)
+	// r.bo = NewVIBuffer(CubeVertices, CubeIndices, 4, 36)
 
 	// Configure global settings
 	gl.ColorMask(true, true, true, true)
 	gl.ClearColor(0.0, 0.0, 0.0, 0.0)
 	gl.Clear(gl.COLOR_BUFFER_BIT)
 
-	// gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
-	// gl.Enable(gl.BLEND)
+	r.Program = program
+	r.Program.Load(r.Window)
+	return r
 }
 
 func (self *Renderer) SetTickRate(rr float64) {
@@ -106,15 +115,11 @@ func (self *Renderer) SetTickRate(rr float64) {
 	self.UnlockedFrameRate = rr != self.RefreshRate
 }
 
-var frames = 0
-var lastTime time.Time
+func (self *Renderer) Run(kill <-chan bool) {
+	gl.Viewport(0, 0, int32(self.Width), int32(self.Height))
 
-func (self *Renderer) Start(kill <-chan bool) {
-	// self.Program = NewTurtleProgram()
-	// self.Program = NewPongProgram()
-	self.Program = NewLifeProgram()
-	// self.Program = NewLiveEditProgram("./assets/shaders/live_vert.glsl", "./assets/shaders/live_frag.glsl")
-	self.Program.Load(self.Window, self.bo)
+	frames := 0.0
+	previousTime := glfw.GetTime()
 	for !self.Window.ShouldClose() {
 		select {
 		// kill
@@ -125,20 +130,19 @@ func (self *Renderer) Start(kill <-chan bool) {
 			self.Capture()
 		// frame limiter
 		case <-self.Tick.C:
-			t := glfw.GetTime()
+			currentTime := glfw.GetTime()
 			frames++
-			currentTime := time.Now()
-			delta := currentTime.Sub(lastTime)
-			if delta > time.Second {
-				fps := frames / int(delta.Seconds())
-				self.Window.SetTitle(fmt.Sprintf("%v FPS @ %v x %v", fps, self.Width, self.Height))
+			delta := currentTime - previousTime
+			if delta > 1.0 {
+				fps := frames / delta
+				self.Window.SetTitle(fmt.Sprintf("%.2f FPS @ %v x %v", fps, self.Width, self.Height))
 
-				lastTime = currentTime
+				previousTime = currentTime
 				frames = 0
 			}
 
 			// run
-			self.Program.Render(t)
+			self.Program.Render(currentTime)
 
 			// maintenance
 			self.Window.SwapBuffers()
@@ -158,98 +162,6 @@ func (self *Renderer) ResizeCallback(w *glfw.Window, width int, height int) {
 
 	self.Program.ResizeCallback(w, self.Width, self.Height)
 }
-
-func (self *Renderer) SwitchToLife() registrable.Registration {
-	return KeyCallbackRegistration{
-		action: glfw.Release,
-		key:    glfw.KeyF1,
-		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
-			self.Program = NewLifeProgram()
-			self.Program.Load(self.Window, self.bo)
-		},
-	}
-}
-
-func (self *Renderer) SwitchToSmoothLife() registrable.Registration {
-	return KeyCallbackRegistration{
-		action: glfw.Release,
-		key:    glfw.KeyF2,
-		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
-			self.Program = NewSmoothLifeProgram()
-			self.Program.Load(self.Window, self.bo)
-		},
-	}
-}
-
-func (self *Renderer) SwitchToMandelbrot() registrable.Registration {
-	return KeyCallbackRegistration{
-		action: glfw.Release,
-		key:    glfw.KeyF3,
-		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
-			self.Program = NewMandelbrotProgram()
-			self.Program.Load(self.Window, self.bo)
-		},
-	}
-}
-
-func (self *Renderer) SwitchToJulia() registrable.Registration {
-	return KeyCallbackRegistration{
-		action: glfw.Release,
-		key:    glfw.KeyF4,
-		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
-			self.Program = NewJuliaProgram()
-			self.Program.Load(self.Window, self.bo)
-		},
-	}
-}
-
-func (self *Renderer) SwitchToLiveEdit() registrable.Registration {
-	return KeyCallbackRegistration{
-		action: glfw.Release,
-		key:    glfw.KeyF5,
-		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
-			self.Program = NewLiveEditProgram("./assets/shaders/live_vert.glsl", "./assets/shaders/live_frag.glsl")
-			self.Program.Load(self.Window, self.bo)
-		},
-	}
-}
-
-func (self *Renderer) SwitchToTurtle() registrable.Registration {
-	return KeyCallbackRegistration{
-		action: glfw.Release,
-		key:    glfw.KeyF6,
-		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
-			self.Program = NewTurtleProgram()
-			self.Program.Load(self.Window, self.bo)
-		},
-	}
-}
-
-func (self *Renderer) SwitchToPong() registrable.Registration {
-	return KeyCallbackRegistration{
-		action: glfw.Release,
-		key:    glfw.KeyF7,
-		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
-			self.Program = NewPongProgram()
-			self.Program.Load(self.Window, self.bo)
-		},
-	}
-}
-
-func (self *Renderer) UnlockFramerate() registrable.Registration {
-	return KeyCallbackRegistration{
-		action: glfw.Release,
-		key:    glfw.KeyU,
-		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
-			if self.UnlockedFrameRate {
-				self.SetTickRate(self.RefreshRate)
-			} else {
-				self.SetTickRate(0)
-			}
-		},
-	}
-}
-
 func (self *Renderer) CloseProgram() registrable.Registration {
 	return KeyCallbackRegistration{
 		action: glfw.Release,
@@ -261,10 +173,24 @@ func (self *Renderer) CloseProgram() registrable.Registration {
 	}
 }
 
+func (self *Renderer) UnlockFramerate() registrable.Registration {
+	return KeyCallbackRegistration{
+		action: glfw.Release,
+		key:    glfw.KeyF1,
+		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+			if self.UnlockedFrameRate {
+				self.SetTickRate(self.RefreshRate)
+			} else {
+				self.SetTickRate(0)
+			}
+		},
+	}
+}
+
 func (self *Renderer) Screencapture() registrable.Registration {
 	return KeyCallbackRegistration{
 		action: glfw.Release,
-		key:    glfw.KeyP,
+		key:    glfw.KeyF2,
 		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 			self.Cmds.Issue(CaptureCmd)
 		},
@@ -274,7 +200,7 @@ func (self *Renderer) Screencapture() registrable.Registration {
 func (self *Renderer) Record() registrable.Registration {
 	return KeyCallbackRegistration{
 		action: glfw.Release,
-		key:    glfw.KeyQ,
+		key:    glfw.KeyF3,
 		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 			if !self.Recorder.On {
 				self.Recorder.Start()
@@ -288,7 +214,7 @@ func (self *Renderer) Record() registrable.Registration {
 func (self *Renderer) ToggleAlwaysOnTop() registrable.Registration {
 	return KeyCallbackRegistration{
 		action: glfw.Release,
-		key:    glfw.KeyT,
+		key:    glfw.KeyF9,
 		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 			if self.Window.GetAttrib(glfw.Floating) == glfw.True {
 				self.Window.SetAttrib(glfw.Floating, glfw.False)
@@ -316,7 +242,7 @@ func (self *Renderer) ToggleCursor() registrable.Registration {
 func (self *Renderer) ToggleWireframe() registrable.Registration {
 	return KeyCallbackRegistration{
 		action: glfw.Release,
-		key:    glfw.KeyD,
+		key:    glfw.KeyF10,
 		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 			self.Wireframe = !self.Wireframe
 

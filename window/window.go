@@ -1,12 +1,10 @@
-package main
+package window
 
 import (
 	"fmt"
 	"image"
 	"image/color"
-	"io"
 	"log"
-	"os"
 	"plugin"
 	"runtime"
 
@@ -18,27 +16,27 @@ import (
 var windowWidth = 1280
 var windowHeight = 720
 
-func init() {
-	// GLFW event handling must run on the main OS thread
-	runtime.LockOSThread()
-}
+type PlugRender func(<-chan bool, *glfw.Window)
 
-type PluggableRender func(<-chan bool, *glfw.Window)
-
-var pluginPath string = "./bin/plugins/"
-var lastWorkingMod string = pluginPath + "plug.so"
-
-// TODO: refactor into packages
 // TODO: make registrable keys to print which keys do what
 // TODO: ability to render text overlays
 // TODO: command to generate embedded asset listings
 
-func main() {
+type Window struct {
+	*glfw.Window
+
+	pluginFolder, pluginFile, pluginLatest string
+}
+
+func init() {
+	runtime.LockOSThread()
+}
+
+func NewWindow() *Window {
 	// init glfw
 	if err := glfw.Init(); err != nil {
 		log.Fatalln("failed to initialize glfw:", err)
 	}
-	defer glfw.Terminate()
 
 	// setup window
 	// opengl
@@ -46,7 +44,6 @@ func main() {
 	glfw.WindowHint(glfw.ContextVersionMinor, 1)
 	glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile)
 	glfw.WindowHint(glfw.OpenGLForwardCompatible, glfw.True)
-	glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile)
 
 	// basic
 	glfw.WindowHint(glfw.Resizable, glfw.True)
@@ -76,6 +73,18 @@ func main() {
 	}
 	window.SetIcon([]image.Image{img})
 
+	return &Window{Window: window}
+}
+
+func (self *Window) Close() {
+	glfw.Terminate()
+}
+
+func (self *Window) HotWindow(_pluginFolder, _pluginFile string) {
+	self.pluginFolder = _pluginFolder
+	self.pluginFile = _pluginFile
+	self.pluginLatest = _pluginFolder + _pluginFile
+
 	kill := make(chan bool)
 
 	watcher, err := fsnotify.NewWatcher()
@@ -84,10 +93,10 @@ func main() {
 	}
 	defer watcher.Close()
 
-	watcher.Add(pluginPath)
+	watcher.Add(self.pluginFolder)
 
 	// check for updates to plugin
-	latestMod := lastWorkingMod
+	latestMod := self.pluginLatest
 	go func() {
 		for {
 			select {
@@ -103,67 +112,23 @@ func main() {
 	}()
 
 	successiveFails := 0
-	for !window.ShouldClose() {
-		err := Render(latestMod, kill, window)
+	for !self.Window.ShouldClose() {
+		err := self.HotRender(latestMod, kill)
 		if err != nil {
 			successiveFails++
-			latestMod = lastWorkingMod
+			latestMod = self.pluginLatest
 			fmt.Println(err)
 		} else {
 			successiveFails = 0
 		}
 
 		if successiveFails > 3 {
-			window.SetShouldClose(true)
+			self.SetShouldClose(true)
 		}
 	}
 }
 
-func copy(src, dst string, BUFFERSIZE int64) error {
-	sourceFileStat, err := os.Stat(src)
-	if err != nil {
-		return err
-	}
-
-	if !sourceFileStat.Mode().IsRegular() {
-		return fmt.Errorf("%s is not a regular file.", src)
-	}
-
-	source, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer source.Close()
-
-	destination, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer destination.Close()
-
-	if err != nil {
-		panic(err)
-	}
-
-	buf := make([]byte, BUFFERSIZE)
-	for {
-		n, err := source.Read(buf)
-		if err != nil && err != io.EOF {
-			return err
-		}
-		if n == 0 {
-			break
-		}
-
-		if _, err := destination.Write(buf[:n]); err != nil {
-			return err
-		}
-	}
-
-	return err
-}
-
-func Render(latestMod string, kill <-chan bool, window *glfw.Window) (err error) {
+func (self *Window) HotRender(latestMod string, kill <-chan bool) (err error) {
 	// load module
 	// 1. open the so file to load the symbols
 	plug, err := plugin.Open(latestMod)
@@ -172,13 +137,13 @@ func Render(latestMod string, kill <-chan bool, window *glfw.Window) (err error)
 	}
 
 	// 2. look up a symbol (an exported function or variable)
-	symRenderer, err := plug.Lookup("PlugRender")
+	symRenderer, err := plug.Lookup("HotProgramFn")
 	if err != nil {
 		return err
 	}
 
 	// 3. Assert that loaded symbol is of a desired type
-	var plugRender PluggableRender
+	var plugRender PlugRender
 	plugRender, ok := symRenderer.(func(<-chan bool, *glfw.Window))
 	if !ok {
 		return err
@@ -188,16 +153,13 @@ func Render(latestMod string, kill <-chan bool, window *glfw.Window) (err error)
 		if r := recover(); r != nil {
 			err = fmt.Errorf("recovered: %v", r)
 		} else {
-			lastWorkingMod = latestMod
-
-			// overwrite existing plugin.so with new valid one
-			// err = copy(latestMod, pluginPath+"plug.so", 1024)
+			self.pluginLatest = latestMod
 		}
 	}()
 
 	// 4. use the module
 	fmt.Printf("Running Plug: %v\n", latestMod)
-	plugRender(kill, window)
+	plugRender(kill, self.Window)
 
 	return nil
 }
