@@ -88,11 +88,6 @@ func NewRenderer(window *glfw.Window, program Program) *Renderer {
 	r.Window.SetKeyCallback(r.KeyCallback)
 	r.Window.SetSizeCallback(r.ResizeCallback)
 
-	// r.bo = NewVIBuffer(C1Vertices, C1Indices, 2, 48)
-	// r.bo = NewVIBuffer(C1Vertices, C1AltIndices, 2, 36)
-	// r.bo = NewVBuffer(QuadVertices, 2, 4)
-	// r.bo = NewVIBuffer(CubeVertices, CubeIndices, 4, 36)
-
 	// Configure global settings
 	gl.ColorMask(true, true, true, true)
 	gl.ClearColor(0.0, 0.0, 0.0, 0.0)

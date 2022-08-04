@@ -11,7 +11,6 @@ var FLOAT32_SIZE int = 4
 type VertexBuffer interface {
 	VertexSize() int32
 	BufferSize() int
-	Stride() int32
 }
 
 type Vertices []float32
@@ -102,10 +101,6 @@ func (self VIBuffer) GetVertices() Vertices {
 
 func (self VIBuffer) GetIndices() Indices {
 	return *self.Indices
-}
-
-func (self VIBuffer) Stride() int32 {
-	return self.GetIndices().Size()
 }
 
 func (self VIBuffer) PosOffset() int {

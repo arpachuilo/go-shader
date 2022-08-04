@@ -5,11 +5,8 @@ import (
 	"log"
 	"math"
 	"math/rand"
-	"os"
-	"path/filepath"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
 	"github.com/go-gl/mathgl/mgl32"
@@ -20,16 +17,11 @@ import (
 )
 
 func init() {
-	HotProgram = NewLiveEditProgram("./assets/shaders/live_vert.glsl", "./assets/shaders/live_frag.glsl")
+	HotProgram = NewLiveEditProgram("./cmd/shader_watch/live_vert.glsl", "./cmd/shader_watch/live_frag.glsl")
 }
 
-// var BuildDate = ""
 func HotProgramFn(kill <-chan bool, window *glfw.Window) {
 	HotRender(kill, window)
-	// fmt.Println(BuildDate)
-	// program := NewLiveEditProgram("./assets/shaders/live_vert.glsl", "./assets/shaders/live_frag.glsl")
-	//
-	// NewRenderer(window, program).Run(kill)
 }
 
 type LiveEditProgram struct {
@@ -39,7 +31,7 @@ type LiveEditProgram struct {
 	paused bool
 	frame  int
 
-	watcher *fsnotify.Watcher
+	watcher *ShaderWatcher
 
 	// current texture
 	texture *Texture
@@ -47,18 +39,15 @@ type LiveEditProgram struct {
 	// current shader
 	vert   string
 	frag   string
-	shader Shader
+	shader *Shader
 
 	// name of file to watch for updates
 	vertFilename string
 	fragFilename string
 
-	// history of successfully compiled shaders
-	vertHistory []string
-	fragHistory []string
-
 	// buffers
-	bo BufferObject
+	bo  BufferObject
+	fbo uint32
 
 	muls       []float64
 	scene      *Scene
@@ -70,35 +59,12 @@ func NewLiveEditProgram(vert, frag string) Program {
 	return &LiveEditProgram{
 		vertFilename: vert,
 		fragFilename: frag,
-		vertHistory:  make([]string, 0),
-		fragHistory:  make([]string, 0),
 
 		scene: NewScene(),
 		muls:  make([]float64, 0),
 
 		mouseDelta: NewMouseDelta(0.1),
 	}
-}
-
-func (self *LiveEditProgram) watch() {
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		panic(err)
-	}
-	// defer watcher.Close()
-
-	log.Println("watching: ", self.fragFilename)
-	watcher.Add(self.vertFilename)
-	watcher.Add(self.fragFilename)
-
-	// initial file load
-	vert, err := os.ReadFile(self.vertFilename)
-	frag, err := os.ReadFile(self.fragFilename)
-	if err == nil {
-		self.compile(string(vert), string(frag))
-	}
-
-	self.watcher = watcher
 }
 
 func (self *LiveEditProgram) Load(window *glfw.Window) {
@@ -114,9 +80,10 @@ func (self *LiveEditProgram) Load(window *glfw.Window) {
 	self.texture = LoadTexture(&img)
 
 	// create+watch shaders
-	self.shader = MustCompileShader(VertexShader, FragShader, self.bo)
-
-	self.watch()
+	shader := MustCompileShader(VertexShader, FragShader, self.bo)
+	self.shader = &shader
+	self.watcher = NewShaderWatcher()
+	self.watcher.Add(self.shader, self.vertFilename, self.fragFilename, self.bo)
 
 	// setup 3d things
 	gl.Enable(gl.DEPTH_TEST)
@@ -133,44 +100,28 @@ func (self *LiveEditProgram) Load(window *glfw.Window) {
 	self.camera = NewCamera(self.width, self.height)
 
 	// setup scene
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 1000; i++ {
 		n := NewNode()
 		n.Object = self.bo
 		scale := rand.Float32() * 5
 		n.Scale = mgl32.Scale3D(scale, scale, scale)
 
 		rand.Seed(time.Now().UnixNano())
-		n.Translation = mgl32.Translate3D(
-			rand.Float32()*50.0*RandSign(),
-			rand.Float32()*50.0*RandSign(),
-			rand.Float32()*50.0*RandSign(),
-		)
+		x := -50.0 + rand.Float32()*(50.0 - -50.0)
+		y := -50.0 + rand.Float32()*(50.0 - -50.0)
+		z := -50.0 + rand.Float32()*(50.0 - -50.0)
+		n.Translation = mgl32.Translate3D(x, y, z)
 
 		self.scene.Root.Add(n)
 		self.muls = append(self.muls, rand.Float64()*5.0+1.0)
 	}
-}
 
-func (self *LiveEditProgram) compile(vert, frag string) {
-	newShader, err := CompileShader(vert, frag, self.bo)
-	if err != nil {
-		log.Println("error", err)
-		return
-	}
+	// setup buffer passes
+	gl.GenFramebuffers(1, &self.fbo)
+	gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
 
-	if self.vert != vert {
-		self.vert = vert
-		self.vertHistory = append(self.vertHistory, frag)
-	}
-
-	if self.frag != frag {
-		self.frag = frag
-		self.fragHistory = append(self.fragHistory, frag)
-	}
-
-	gl.BindFragDataLocation(uint32(newShader), 0, gl.Str("position\x00"))
-	self.shader = newShader
-	self.paused = false
+	gl.ColorMask(true, true, true, true)
+	gl.ClearColor(0.0, 0.0, 0.0, 1.0)
 }
 
 func (self *LiveEditProgram) run(t float64) {
@@ -178,13 +129,17 @@ func (self *LiveEditProgram) run(t float64) {
 
 	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
-	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
-	gl.BindVertexArray(self.bo.VAO())
+	gl.Clear(gl.COLOR_BUFFER_BIT)
 
+	// first pass to fbo
+	gl.BindFramebuffer(gl.FRAMEBUFFER, self.fbo)
+	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, self.texture.Handle, 0)
 	self.texture.Activate(gl.TEXTURE0)
 
 	// walk scene
+	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
 	i := 0
+	// todo frustum culling
 	self.scene.Root.Walk(func(n *Node) {
 		cubeRotation := 360.0 * math.Sin(t/self.muls[i]) / 2.0
 		cubeAngle := float32(Deg2Rad(cubeRotation))
@@ -196,6 +151,8 @@ func (self *LiveEditProgram) run(t float64) {
 		viewMatrix := self.camera.View()
 
 		self.shader.Use().
+			Uniform1i("p_buffer", 0).
+			Uniform1i("p_use", 0).
 			UniformMatrix4fv("ModelMatrix", &modelMatrix).
 			UniformMatrix4fv("ViewMatrix", &viewMatrix).
 			UniformMatrix4fv("ProjectionMatrix", &self.camera.Projection).
@@ -208,43 +165,20 @@ func (self *LiveEditProgram) run(t float64) {
 		self.bo.Draw()
 		i++
 	})
+
+	// second pass
+	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
 }
 
 func (self *LiveEditProgram) Render(t float64) {
 	select {
 	case event, ok := <-self.watcher.Events:
-		if !ok {
-			break
-		}
-
-		// have to check "rename" for some reason?!
-		if event.Op == fsnotify.Create || event.Op == fsnotify.Write || event.Op == fsnotify.Rename {
-			log.Println("modified file:", event.Name)
-			self.watcher.Add(event.Name)
-
-			vert := self.vert
-			frag := self.frag
-
-			// read file in
-			data, err := os.ReadFile(event.Name)
-			if err != nil {
-				log.Println("error:", err)
-				break
-			}
-
-			// if strings.ContainsAny
-			enb := filepath.Base(event.Name)
-			vfb := filepath.Base(self.vertFilename)
-			ffb := filepath.Base(self.fragFilename)
-			switch enb {
-			case vfb:
-				vert = string(data)
-			case ffb:
-				frag = string(data)
-			}
-
-			// attempt to create new shader
-			self.compile(string(vert), string(frag))
+		shader, err := self.watcher.Handle(event, ok)
+		if err != nil {
+			log.Println(err)
+		} else if shader != nil {
+			gl.BindFragDataLocation(*shader.Program, 0, gl.Str("position\x00"))
+			self.paused = false
 		}
 	default:
 		if self.paused {
