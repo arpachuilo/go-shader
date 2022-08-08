@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"image"
 	"image/color"
 	"math"
@@ -17,13 +16,12 @@ import (
 	_ "embed"
 )
 
-var BuildDate = ""
+func init() {
+	HotProgram = NewLifeProgram()
+}
 
-func HotRender(kill <-chan bool, window *glfw.Window) {
-	fmt.Println(BuildDate)
-	program := NewLifeProgram()
-
-	NewRenderer(window, program).Run(kill)
+func HotProgramFn(kill <-chan bool, window *glfw.Window) {
+	HotRender(kill, window)
 }
 
 //go:embed cyclic.glsl
@@ -99,9 +97,13 @@ func NewLifeProgram() Program {
 	}
 }
 
+func (self *LifeProgram) LoadR(r *Renderer) {
+	self.Load(r.Window)
+}
+
 func (self *LifeProgram) Load(window *glfw.Window) {
 	self.Window = window
-	self.bo = NewVBuffer(QuadVertices, 2, 4)
+	self.bo = NewV4Buffer(QuadVertices, 2, 4)
 	self.width, self.height = window.GetFramebufferSize()
 
 	// create textures

@@ -189,28 +189,9 @@ func (self *Shader) Compile(vertexShaderSource, fragmentShaderSource string, bo 
 	gl.DeleteShader(vertexShader)
 	gl.DeleteShader(fragmentShader)
 
-	// bind output color location
-	gl.BindFragDataLocation(program, 0, gl.Str("outputColor\x00"))
-
 	// bind buffer object
+	// gl.BindVertexArray(bo.VAO())
 	// bind vertex coordinates
-	vertCoords := uint32(gl.GetAttribLocation(program, gl.Str("vert\x00")))
-	gl.EnableVertexAttribArray(vertCoords)
-	gl.VertexAttribPointerWithOffset(
-		vertCoords, bo.GetSize(), gl.FLOAT, false,
-		bo.VertexSize(),
-		uintptr(bo.PosOffset()),
-	)
-
-	// bind texture coordinates
-	texCoords := uint32(gl.GetAttribLocation(program, gl.Str("vertTexCoord\x00")))
-	gl.EnableVertexAttribArray(texCoords)
-	gl.VertexAttribPointerWithOffset(
-		texCoords, bo.GetSize(), gl.FLOAT, false,
-		bo.VertexSize(),
-		uintptr(bo.TexOffset()),
-	)
-
 	if self.Program != nil {
 		self.Cleanup()
 	}
@@ -429,5 +410,12 @@ func (self Shader) UniformMatrix4fv(name string, values *mgl32.Mat4) Shader {
 	attr := fmt.Sprintf("%v\x00", name)
 	location := gl.GetUniformLocation(*self.Program, gl.Str(attr))
 	gl.ProgramUniformMatrix4fv(*self.Program, location, 1, false, &values[0])
+	return self
+}
+
+func (self Shader) UniformVec3(name string, values *mgl32.Vec3) Shader {
+	attr := fmt.Sprintf("%v\x00", name)
+	location := gl.GetUniformLocation(*self.Program, gl.Str(attr))
+	gl.ProgramUniform3f(*self.Program, location, values[0], values[1], values[2])
 	return self
 }

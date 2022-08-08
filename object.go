@@ -6,7 +6,8 @@ import (
 	"github.com/go-gl/gl/v4.1-core/gl"
 )
 
-var FLOAT32_SIZE int = 4
+var F32_SIZE int = int(unsafe.Sizeof(float32(0)))
+var F32_SIZE32 int32 = int32(F32_SIZE)
 
 type VertexBuffer interface {
 	VertexSize() int32
@@ -16,11 +17,11 @@ type VertexBuffer interface {
 type Vertices []float32
 
 func (self Vertices) VertexSize() int32 {
-	return 4 * int32(FLOAT32_SIZE)
+	return 4 * int32(F32_SIZE)
 }
 
 func (self Vertices) BufferSize() int {
-	return len(self) * FLOAT32_SIZE
+	return len(self) * F32_SIZE
 }
 
 type Indices []uint8
@@ -34,26 +35,18 @@ type BufferObject interface {
 	VAO() uint32
 	VBO() uint32
 	IBO() uint32
-	GetSize() int32
-	GetVertices() Vertices
-	GetIndices() Indices
-	PosOffset() int
-	TexOffset() int
-
-	VertexBuffer
 }
 
 type VIBuffer struct {
 	Tris          int32
-	Size          int32
 	vao, vbo, ibo uint32
 
 	*Vertices
 	*Indices
 }
 
-func NewVIBuffer(vertices Vertices, indices Indices, size int32, tris int32) *VIBuffer {
-	buf := &VIBuffer{Vertices: &vertices, Indices: &indices, Size: size, Tris: tris}
+func NewVIBuffer(vertices Vertices, indices Indices, tris int32) *VIBuffer {
+	buf := &VIBuffer{Vertices: &vertices, Indices: &indices, Tris: tris}
 
 	gl.GenVertexArrays(1, &buf.vao)
 	gl.BindVertexArray(buf.vao)
@@ -66,13 +59,38 @@ func NewVIBuffer(vertices Vertices, indices Indices, size int32, tris int32) *VI
 	// Indices
 	gl.GenBuffers(1, &buf.ibo)
 	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, buf.ibo)
-	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, len(indices)*1, gl.Ptr(indices), gl.STATIC_DRAW)
+	// byte size indices
+	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, len(indices), gl.Ptr(indices), gl.STATIC_DRAW)
+
+	gl.EnableVertexAttribArray(0)
+	gl.VertexAttribPointerWithOffset(
+		0, 3, gl.FLOAT, false,
+		int32(F32_SIZE*8),
+		uintptr(0),
+	)
+
+	// bind texture coordinates
+	gl.EnableVertexAttribArray(1)
+	gl.VertexAttribPointerWithOffset(
+		1, 2, gl.FLOAT, false,
+		int32(F32_SIZE*8),
+		uintptr(3*int32(F32_SIZE)),
+	)
+
+	// bind normals
+	gl.EnableVertexAttribArray(2)
+	gl.VertexAttribPointerWithOffset(
+		2, 3, gl.FLOAT, false,
+		int32(F32_SIZE*8),
+		uintptr(5*int32(F32_SIZE)),
+	)
 
 	return buf
 }
 
 func (self VIBuffer) Draw() {
-	gl.DrawElements(gl.TRIANGLES, self.Tris, gl.UNSIGNED_BYTE, unsafe.Pointer(nil))
+	gl.BindVertexArray(self.vao)
+	gl.DrawElements(gl.TRIANGLES, self.Indices.Size(), gl.UNSIGNED_BYTE, nil)
 }
 
 func (self VIBuffer) VAO() uint32 {
@@ -87,30 +105,6 @@ func (self VIBuffer) IBO() uint32 {
 	return self.ibo
 }
 
-func (self VIBuffer) GetSize() int32 {
-	return self.Size
-}
-
-func (self VIBuffer) VertexSize() int32 {
-	return self.Vertices.VertexSize() * 2
-}
-
-func (self VIBuffer) GetVertices() Vertices {
-	return *self.Vertices
-}
-
-func (self VIBuffer) GetIndices() Indices {
-	return *self.Indices
-}
-
-func (self VIBuffer) PosOffset() int {
-	return 0 * FLOAT32_SIZE
-}
-
-func (self VIBuffer) TexOffset() int {
-	return int(self.Size) * FLOAT32_SIZE
-}
-
 type VBuffer struct {
 	Tris          int32
 	Size          int32
@@ -120,7 +114,7 @@ type VBuffer struct {
 	*Indices
 }
 
-func NewVBuffer(vertices Vertices, size int32, tris int32) *VBuffer {
+func NewV4Buffer(vertices Vertices, size int32, tris int32) *VBuffer {
 	buf := &VBuffer{Vertices: &vertices, Size: size, Tris: tris}
 
 	gl.GenVertexArrays(1, &buf.vao)
@@ -129,6 +123,22 @@ func NewVBuffer(vertices Vertices, size int32, tris int32) *VBuffer {
 	gl.GenBuffers(1, &buf.vbo)
 	gl.BindBuffer(gl.ARRAY_BUFFER, buf.vbo)
 	gl.BufferData(gl.ARRAY_BUFFER, vertices.BufferSize(), gl.Ptr(vertices), gl.STATIC_DRAW)
+
+	// bind positions
+	gl.EnableVertexAttribArray(0)
+	gl.VertexAttribPointerWithOffset(
+		0, size, gl.FLOAT, false,
+		vertices.VertexSize(),
+		uintptr(0),
+	)
+
+	// bind textures
+	gl.EnableVertexAttribArray(1)
+	gl.VertexAttribPointerWithOffset(
+		1, size, gl.FLOAT, false,
+		vertices.VertexSize(),
+		uintptr(size*int32(F32_SIZE)),
+	)
 
 	return buf
 }
@@ -148,26 +158,6 @@ func (self VBuffer) VBO() uint32 {
 
 func (self VBuffer) IBO() uint32 {
 	return 0
-}
-
-func (self VBuffer) GetSize() int32 {
-	return self.Size
-}
-
-func (self VBuffer) GetVertices() Vertices {
-	return *self.Vertices
-}
-
-func (self VBuffer) GetIndices() Indices {
-	return nil
-}
-
-func (self VBuffer) PosOffset() int {
-	return 0
-}
-
-func (self VBuffer) TexOffset() int {
-	return int(self.Size) * FLOAT32_SIZE
 }
 
 var TriangleVertices = Vertices{
@@ -250,14 +240,14 @@ var C1AltIndices = Indices{
 }
 
 var CubeVertices = Vertices{
-	-.5, -.5, .5, 1, 0, 0, 1, 1,
-	-.5, .5, .5, 1, 1, 0, 0, 1,
-	.5, .5, .5, 1, 0, 1, 0, 1,
-	.5, -.5, .5, 1, 1, 1, 0, 1,
-	-.5, -.5, -.5, 1, 1, 1, 1, 1,
-	-.5, .5, -.5, 1, 1, 0, 0, 1,
-	.5, .5, -.5, 1, 1, 0, 1, 1,
-	.5, -.5, -.5, 1, 0, 0, 1, 1,
+	-.5, -.5, .5, 1, 0, 0, 0, 0,
+	-.5, .5, .5, 1, 1, 0, 0, 0,
+	.5, .5, .5, 1, 1, 1, 0, 0,
+	.5, -.5, .5, 1, 0, 1, 0, 0,
+	-.5, -.5, -.5, 1, 0, 0, 0, 0,
+	-.5, .5, -.5, 1, 1, 0, 0, 0,
+	.5, .5, -.5, 1, 1, 1, 0, 0,
+	.5, -.5, -.5, 1, 0, 1, 0, 0,
 }
 
 var CubeIndices = Indices{
@@ -267,4 +257,118 @@ var CubeIndices = Indices{
 	3, 6, 2, 3, 7, 6,
 	1, 6, 5, 1, 2, 6,
 	7, 5, 6, 7, 4, 5,
+}
+
+// 3 Position / 2 Texture / 3 Normal
+var CubeAltVertices = Vertices{
+	// Front face
+	-0.5, -0.5, 0.5,
+	0, 0,
+	0, 0, 1,
+
+	0.5, -0.5, 0.5,
+	1, 0,
+	0, 0, 1,
+
+	0.5, 0.5, 0.5,
+	1, 1,
+	0, 0, 1,
+
+	-0.5, 0.5, 0.5,
+	0, 1,
+	0, 0, 1,
+
+	// Back face
+	-0.5, -0.5, -0.5,
+	0, 0,
+	0, 0, -1,
+
+	-0.5, 0.5, -0.5,
+	0, 1,
+	0, 0, -1,
+
+	0.5, 0.5, -0.5,
+	1, 1,
+	0, 0, -1,
+
+	0.5, -0.5, -0.5,
+	1, 0,
+	0, 0, -1,
+
+	// Top face
+	-0.5, 0.5, -0.5,
+	0, 0,
+	0, 1, 0,
+
+	-0.5, 0.5, 0.5,
+	0, 1,
+	0, 1, 0,
+
+	0.5, 0.5, 0.5,
+	1, 1,
+	0, 1, 0,
+
+	0.5, 0.5, -0.5,
+	1, 0,
+	0, 1, 0,
+
+	// Bottom face
+	-0.5, -0.5, -0.5,
+	0, 0,
+	0, -1, 0,
+
+	0.5, -0.5, -0.5,
+	1, 0,
+	0, -1, 0,
+
+	0.5, -0.5, 0.5,
+	1, 1,
+	0, -1, 0,
+
+	-0.5, -0.5, 0.5,
+	0, 1,
+	0, -1, 0,
+
+	// Right face
+	0.5, -0.5, -0.5,
+	0, 0,
+	1, 0, 0,
+
+	0.5, 0.5, -0.5,
+	1, 0,
+	1, 0, 0,
+
+	0.5, 0.5, 0.5,
+	1, 1,
+	1, 0, 0,
+
+	0.5, -0.5, 0.5,
+	0, 1,
+	1, 0, 0,
+
+	// Left face
+	-0.5, -0.5, -0.5,
+	0, 0,
+	-1, 0, 0,
+
+	-0.5, -0.5, 0.5,
+	0, 1,
+	-1, 0, 0,
+
+	-0.5, 0.5, 0.5,
+	1, 1,
+	-1, 0, 0,
+
+	-0.5, 0.5, -0.5,
+	1, 0,
+	-1, 0, 0,
+}
+
+var CubeAltIndices = Indices{
+	0, 1, 2, 0, 2, 3, // front
+	4, 5, 6, 4, 6, 7, // back
+	8, 9, 10, 8, 10, 11, // top
+	12, 13, 14, 12, 14, 15, // bottom
+	16, 17, 18, 16, 18, 19, // right
+	20, 21, 22, 20, 22, 23, // left
 }

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"image"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
@@ -14,13 +13,12 @@ import (
 	_ "embed"
 )
 
-var BuildDate = ""
+func init() {
+	HotProgram = NewJuliaProgram()
+}
 
-func HotRender(kill <-chan bool, window *glfw.Window) {
-	fmt.Println(BuildDate)
-	program := NewJuliaProgram()
-
-	NewRenderer(window, program).Run(kill)
+func HotProgramFn(kill <-chan bool, window *glfw.Window) {
+	HotRender(kill, window)
 }
 
 //go:embed julia.glsl
@@ -65,14 +63,17 @@ func NewJuliaProgram() Program {
 
 		complexMode: true,
 		zoomFactor:  0.01,
-
-		mouseDelta: NewMouseDelta(.0001),
 	}
+}
+
+func (self *JuliaProgram) LoadR(r *Renderer) {
+	self.Load(r.Window)
 }
 
 func (self *JuliaProgram) Load(window *glfw.Window) {
 	self.Window = window
-	self.bo = NewVBuffer(QuadVertices, 2, 4)
+	self.mouseDelta = NewMouseDelta(self.Window, .0001)
+	self.bo = NewV4Buffer(QuadVertices, 2, 4)
 	width, height := window.GetFramebufferSize()
 
 	img := *image.NewRGBA(image.Rect(0, 0, width, height))

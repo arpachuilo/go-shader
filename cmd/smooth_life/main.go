@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"image"
 	"image/color"
 	"math"
@@ -17,13 +16,12 @@ import (
 	_ "embed"
 )
 
-var BuildDate = ""
+func init() {
+	HotProgram = NewSmoothLifeProgram()
+}
 
-func HotRender(kill <-chan bool, window *glfw.Window) {
-	fmt.Println(BuildDate)
-	program := NewSmoothLifeProgram()
-
-	NewRenderer(window, program).Run(kill)
+func HotProgramFn(kill <-chan bool, window *glfw.Window) {
+	HotRender(kill, window)
 }
 
 //go:embed smooth_out.glsl
@@ -118,9 +116,13 @@ func NewSmoothLifeProgram() Program {
 	}
 }
 
+func (self *SmoothLifeProgram) LoadR(r *Renderer) {
+	self.Load(r.Window)
+}
+
 func (self *SmoothLifeProgram) Load(window *glfw.Window) {
 	self.Window = window
-	self.bo = NewVBuffer(QuadVertices, 2, 4)
+	self.bo = NewV4Buffer(QuadVertices, 2, 4)
 	width, height := window.GetFramebufferSize()
 
 	// create textures

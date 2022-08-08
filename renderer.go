@@ -34,19 +34,19 @@ type Renderer struct {
 	Program Program
 	Window  *glfw.Window
 
+	PauseBufferSwap   bool
 	Wireframe         bool
 	Tick              *time.Ticker
 	RefreshRate       float64
 	UnlockedFrameRate bool
 	Width, Height     int
 
-	KeyPressDetection *KeyPressDetection
-	Cmds              CmdChannels
+	Cmds CmdChannels
 
-	Recorder *Recorder
-	bo       BufferObject
-
+	*Recorder
+	*KeyPressDetection
 	*KeyRegister
+	*Cleaner
 }
 
 // NewRenderer Create new renderer
@@ -59,6 +59,8 @@ func NewRenderer(window *glfw.Window, program Program) *Renderer {
 		Cmds:              NewCmdChannels(),
 
 		Recorder: NewRecorder(window),
+
+		Cleaner: &Cleaner{},
 	}
 
 	r.KeyRegister = NewKeyRegister()
@@ -94,7 +96,7 @@ func NewRenderer(window *glfw.Window, program Program) *Renderer {
 	gl.Clear(gl.COLOR_BUFFER_BIT)
 
 	r.Program = program
-	r.Program.Load(r.Window)
+	r.Program.LoadR(r)
 	return r
 }
 
@@ -112,6 +114,7 @@ func (self *Renderer) SetTickRate(rr float64) {
 
 func (self *Renderer) Run(kill <-chan bool) {
 	gl.Viewport(0, 0, int32(self.Width), int32(self.Height))
+	defer self.Cleaner.Run()
 
 	frames := 0.0
 	previousTime := glfw.GetTime()
@@ -140,7 +143,10 @@ func (self *Renderer) Run(kill <-chan bool) {
 			self.Program.Render(currentTime)
 
 			// maintenance
-			self.Window.SwapBuffers()
+			if !self.PauseBufferSwap {
+				self.Window.SwapBuffers()
+			}
+
 			glfw.PollEvents()
 
 			// record

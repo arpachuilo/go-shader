@@ -1,18 +1,48 @@
 #version 410
 
+// https://learnopengl.com/Lighting/Colors
 uniform vec2 u_resolution;
 uniform vec2 u_mouse;
 uniform float u_time;
 uniform int u_frame;
 uniform float u_farclip;
 
-uniform sampler2D p_buffer;
-uniform int p_use;
+// matrices
+uniform mat4 ModelMatrix;
+uniform mat4 ViewMatrix;
+uniform mat4 ProjectionMatrix;
 
-in vec4 fragTexCoord;
+// mat
+struct Material {
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
+    float shininess;
+}; 
+  
+uniform Material material;
+
+// lights
+struct Light {
+    vec3 position;
+  
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
+};
+
+uniform Light light; 
+
+in vec4 ex_wposition;
 in vec4 ex_position;
 
-out vec4 outputColor;
+in vec2 ex_tex;
+
+in vec3 ex_normal;
+in vec3 ex_wnormal;
+
+layout(location = 0) out vec4 outputColor;
+layout(location = 1) out vec4 outputNormal;
 
 vec3 turbo(float x) {
   float r = 0.1357 + x * ( 4.5974 - x * ( 42.3277 - x * ( 130.5887 - x * ( 150.5666 - x * 58.1375 ))));
@@ -21,12 +51,31 @@ vec3 turbo(float x) {
   return vec3(r,g,b);
 }
 
-vec4 get(vec2 coord) {
-  vec3 t = texture(p_buffer, vec2(gl_FragCoord.xy + coord) / u_resolution, 0).xyz;
-  return vec4(t.zyx, ex_position.w);
+// phong https://learnopengl.com/Lighting/Basic-Lighting
+void main() {
+  // vec3 tColor = turbo(1.0 - ex_wposition.w/u_farclip*2);
+
+  // ambient
+  vec3 ambient = light.ambient * material.ambient;
+
+  // diffuse
+  vec3 norm = normalize(ex_normal);
+  vec3 lightDir = normalize(light.position - ex_position.xyz);
+  float diff = max(dot(norm, lightDir), 0.0);
+  vec3 diffuse = light.diffuse * (diff * material.diffuse);
+
+  // specular
+  vec3 viewDir = normalize(ViewMatrix[3].xyz - ex_position.xyz);
+  vec3 reflectDir = reflect(-lightDir, norm);
+  float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
+  vec3 specular = light.specular * (spec * material.specular);
+
+  // combine
+  vec3 color = (ambient + diffuse + specular);
+
+  // output
+  // color = vec3(1.0);
+  outputColor = vec4(color, 1.0);
+  outputNormal = vec4(ex_normal, 1.0);
 }
 
-void main() {
-  outputColor = vec4(turbo(1.0 - ex_position.w/u_farclip), 1.0);
-  // outputColor = vec4(1.0);
-}

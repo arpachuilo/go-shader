@@ -4,6 +4,7 @@ import (
 	"math"
 	"math/rand"
 
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/go-gl/mathgl/mgl64"
 )
 
@@ -45,4 +46,31 @@ func RandSign() float32 {
 	}
 
 	return 1.0
+}
+
+func RandMGL32Vec3() mgl32.Vec3 {
+	return mgl32.Vec3{
+		float32(rand.Float64()),
+		float32(rand.Float64()),
+		float32(rand.Float64()),
+	}
+}
+
+// rand sphere point generation https://karthikkaranth.me/blog/generating-random-points-in-a-sphere/
+func RandPointInSphere[T float32 | float64](radius float64) (T, T, T) {
+	u := rand.Float64()
+	v := rand.Float64()
+	theta := u * 2.0 * math.Pi
+	phi := math.Acos(2.0*v - 1.0)
+	r := math.Cbrt(rand.Float64())
+	sinTheta := math.Sin(theta)
+	cosTheta := math.Cos(theta)
+	sinPhi := math.Sin(phi)
+	cosPhi := math.Cos(phi)
+
+	x := T(r * sinPhi * cosTheta * radius)
+	y := T(r * sinPhi * sinTheta * radius)
+	z := T(r * cosPhi * radius)
+
+	return x, y, z
 }

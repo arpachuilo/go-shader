@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"image"
 	"image/color"
 	"math"
@@ -19,13 +18,12 @@ import (
 	_ "embed"
 )
 
-var BuildDate = ""
+func init() {
+	HotProgram = NewPongProgram()
+}
 
-func HotRender(kill <-chan bool, window *glfw.Window) {
-	fmt.Println(BuildDate)
-	program := NewPongProgram()
-
-	NewRenderer(window, program).Run(kill)
+func HotProgramFn(kill <-chan bool, window *glfw.Window) {
+	HotRender(kill, window)
 }
 
 var RecolorCmd = "recolor"
@@ -132,10 +130,12 @@ func NewPongProgram() Program {
 		gradientIndex: *NewCyclicArray([]int32{0, 1, 2, 3}),
 	}
 }
-
+func (self *PongProgram) LoadR(r *Renderer) {
+	self.Load(r.Window)
+}
 func (self *PongProgram) Load(window *glfw.Window) {
 	self.Window = window
-	self.bo = NewVBuffer(QuadVertices, 2, 4)
+	self.bo = NewV4Buffer(QuadVertices, 2, 4)
 	width, height := window.GetFramebufferSize()
 
 	// create textures

@@ -70,7 +70,7 @@ void main() {
   }
 
   // sum each channel alive
-  float oo = 2.0; // makes cool effect this way
+  float oo = 1.0; // makes cool effect this way
   ivec4 sum = alive(get(vec2(-oo, -oo))) +
               alive(get(vec2(-oo,  0))) +
               alive(get(vec2(-oo,  oo))) +

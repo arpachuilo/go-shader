@@ -8,15 +8,18 @@ import (
 )
 
 type Texture struct {
-	Image  *image.RGBA
 	Handle uint32
+	Image  *image.RGBA
 }
+
+var LastActiveTexture0 uint32
 
 func LoadTexture(rgba *image.RGBA) *Texture {
 	var texture uint32
 	gl.GenTextures(1, &texture)
 	gl.ActiveTexture(gl.TEXTURE0)
 	gl.BindTexture(gl.TEXTURE_2D, texture)
+	defer gl.BindTexture(gl.TEXTURE_2D, LastActiveTexture0)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
@@ -32,26 +35,25 @@ func LoadTexture(rgba *image.RGBA) *Texture {
 		gl.UNSIGNED_BYTE,
 		gl.Ptr(rgba.Pix))
 
+	// bind back 0 texture
 	return &Texture{
-		rgba,
 		texture,
+		rgba,
 	}
 }
 
-var LastActiveTexture0 uint32
-
-func (t *Texture) Resize(width, height int) *Texture {
+func (self *Texture) Resize(width, height int) *Texture {
 	// Create new dst image
 	dst := image.NewRGBA(image.Rect(0, 0, width, height))
 
 	// Resize
-	draw.NearestNeighbor.Scale(dst, dst.Rect, t.Image, t.Image.Bounds(), draw.Over, nil)
+	draw.NearestNeighbor.Scale(dst, dst.Rect, self.Image, self.Image.Bounds(), draw.Over, nil)
 
 	// Override
-	t.Image = dst
+	self.Image = dst
 
 	gl.ActiveTexture(gl.TEXTURE0)
-	gl.BindTexture(gl.TEXTURE_2D, t.Handle)
+	gl.BindTexture(gl.TEXTURE_2D, self.Handle)
 	gl.TexImage2D(
 		gl.TEXTURE_2D,
 		0,
@@ -65,15 +67,15 @@ func (t *Texture) Resize(width, height int) *Texture {
 	gl.ActiveTexture(gl.TEXTURE0)
 	gl.BindTexture(gl.TEXTURE_2D, LastActiveTexture0)
 
-	return t
+	return self
 }
 
-func (t *Texture) Activate(tex uint32) *Texture {
+func (self *Texture) Activate(tex uint32) *Texture {
 	gl.ActiveTexture(tex)
-	gl.BindTexture(gl.TEXTURE_2D, t.Handle)
+	gl.BindTexture(gl.TEXTURE_2D, self.Handle)
 	if tex == gl.TEXTURE0 {
-		LastActiveTexture0 = t.Handle
+		LastActiveTexture0 = self.Handle
 	}
 
-	return t
+	return self
 }

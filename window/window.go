@@ -7,6 +7,7 @@ import (
 	"log"
 	"plugin"
 	"runtime"
+	"runtime/debug"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-gl/glfw/v3.3/glfw"
@@ -48,7 +49,7 @@ func NewWindow() *Window {
 	// basic
 	glfw.WindowHint(glfw.Resizable, glfw.True)
 	glfw.WindowHint(glfw.CenterCursor, glfw.True)
-	glfw.WindowHint(glfw.Focused, glfw.False)
+	// glfw.WindowHint(glfw.Focused, glfw.False)
 	glfw.WindowHint(glfw.TransparentFramebuffer, glfw.True)
 
 	// setup os specific hints
@@ -152,6 +153,7 @@ func (self *Window) HotRender(latestMod string, kill <-chan bool) (err error) {
 
 	defer func() {
 		if r := recover(); r != nil {
+			debug.PrintStack()
 			err = fmt.Errorf("recovered: %v", r)
 		} else {
 			self.pluginLatest = latestMod

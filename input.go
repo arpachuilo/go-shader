@@ -84,24 +84,19 @@ func (self *KeyPressDetection) HandleKeyPress(key glfw.Key, action glfw.Action, 
 }
 
 type MouseDelta struct {
+	window               *glfw.Window
 	previousX, previousY float64
-
-	Scale float64
+	scale                float64
+	screenReentryTicks   int
 }
 
-func NewMouseDelta(scale float64) *MouseDelta {
+func NewMouseDelta(w *glfw.Window, scale float64) *MouseDelta {
 	return &MouseDelta{
-		previousX: 0,
-		previousY: 0,
-		Scale:     scale,
-	}
-}
-
-func NewMouseDeltaWithPrevious(scale, previousX, previousY float64) *MouseDelta {
-	return &MouseDelta{
-		previousX: previousX,
-		previousY: previousY,
-		Scale:     scale,
+		window:             w,
+		previousX:          0,
+		previousY:          0,
+		scale:              scale,
+		screenReentryTicks: 0,
 	}
 }
 
@@ -109,16 +104,28 @@ func (self *MouseDelta) DeltaX(currentX float64) float64 {
 	deltaX := currentX - self.previousX
 
 	self.previousX = currentX
-	return (deltaX) * self.Scale
+	return (deltaX) * self.scale
 }
 
 func (self *MouseDelta) DeltaY(currentY float64) float64 {
 	deltaY := self.previousY - currentY
 
 	self.previousY = currentY
-	return (deltaY) * self.Scale
+	return (deltaY) * self.scale
 }
 
 func (self *MouseDelta) Delta(currentX, currentY float64) (float64, float64) {
+	if self.window.GetInputMode(glfw.CursorMode) != glfw.CursorDisabled {
+		self.screenReentryTicks = 0
+		return 0, 0
+	}
+
+	if self.screenReentryTicks < 2 {
+		self.previousX = currentX
+		self.previousY = currentY
+		self.screenReentryTicks++
+		return 0, 0
+	}
+
 	return self.DeltaX(currentX), self.DeltaY(currentY)
 }

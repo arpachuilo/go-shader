@@ -65,12 +65,13 @@ void main() {
   }
 
   float e = 1.0 / stages / 2.0;
+  float oo = 2.0; // makes cool effect this way
   vec4 current = get(vec2(0, 0));
   vec4 next = nextStage(e, current);
-  ivec4 neighbors = successor(e, next, get(vec2(-1,  0))) +
-                    successor(e, next, get(vec2( 0, -1))) +
-                    successor(e, next, get(vec2( 0,  1))) +
-                    successor(e, next, get(vec2( 1,  0)));
+  ivec4 neighbors = successor(e, next, get(vec2(-oo,  0))) +
+                    successor(e, next, get(vec2( 0, -oo))) +
+                    successor(e, next, get(vec2( 0,  oo))) +
+                    successor(e, next, get(vec2( oo,  0)));
 
   outputColor = op(current, next, neighbors);
 }

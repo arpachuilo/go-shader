@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"image"
 	"image/color"
 	"math"
@@ -18,13 +17,12 @@ import (
 	_ "embed"
 )
 
-var BuildDate = ""
+func init() {
+	HotProgram = NewTurtleProgram()
+}
 
-func HotRender(kill <-chan bool, window *glfw.Window) {
-	fmt.Println(BuildDate)
-	program := NewTurtleProgram()
-
-	NewRenderer(window, program).Run(kill)
+func HotProgramFn(kill <-chan bool, window *glfw.Window) {
+	HotRender(kill, window)
 }
 
 var RecolorCmd = "recolor"
@@ -117,10 +115,12 @@ func NewTurtleProgram() Program {
 		gradientIndex: *NewCyclicArray([]int32{0, 1, 2, 3}),
 	}
 }
-
+func (self *TurtleProgram) LoadR(r *Renderer) {
+	self.Load(r.Window)
+}
 func (self *TurtleProgram) Load(window *glfw.Window) {
 	self.Window = window
-	self.bo = NewVBuffer(QuadVertices, 2, 4)
+	self.bo = NewV4Buffer(QuadVertices, 2, 4)
 	self.width, self.height = window.GetFramebufferSize()
 
 	// create textures
