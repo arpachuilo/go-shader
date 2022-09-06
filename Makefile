@@ -7,7 +7,9 @@ GOGET=$(GOCMD) get
 
 NOW=$(shell date +%s)
 BINARY_NAME=bin/opengl_programs
-PLUG_FILES=cmd/$(program)/main.go
+
+PROGRAM=shader_watch
+PLUG_FILES=cmd/$(PROGRAM)/main.go
 
 WINDOW_FILE=$(shell stat -f window_`go env GOOS`.go || stat -f window_unsupported.go)
 HOT_FILES=cmd/hot/main.go

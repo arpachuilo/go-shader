@@ -49,7 +49,6 @@ func NewWindow() *Window {
 	// basic
 	glfw.WindowHint(glfw.Resizable, glfw.True)
 	glfw.WindowHint(glfw.CenterCursor, glfw.True)
-	// glfw.WindowHint(glfw.Focused, glfw.False)
 	glfw.WindowHint(glfw.TransparentFramebuffer, glfw.True)
 
 	// setup os specific hints

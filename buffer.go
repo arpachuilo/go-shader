@@ -42,18 +42,16 @@ func NewRenderbuffer(width, height int) *Renderbuffer {
 	fbo.Bind()
 	defer fbo.Unbind()
 
-	gl.BindFramebuffer(gl.FRAMEBUFFER, fbo.Handle)
-
 	// color attachment0
 	img0 := image.NewRGBA(image.Rect(0, 0, width, height))
 	tex0 := LoadTexture(img0)
-	tex0.Activate(gl.TEXTURE0)
+	// tex0.Activate(gl.TEXTURE0)
 	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex0.Handle, 0)
 
 	// color attachment1
 	img1 := image.NewRGBA(image.Rect(0, 0, width, height))
 	tex1 := LoadTexture(img1)
-	tex1.Activate(gl.TEXTURE1)
+	// tex1.Activate(gl.TEXTURE1)
 	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, tex1.Handle, 0)
 
 	// create render buffer

@@ -215,7 +215,7 @@ func (self *Renderer) Record() registrable.Registration {
 func (self *Renderer) ToggleAlwaysOnTop() registrable.Registration {
 	return KeyCallbackRegistration{
 		action: glfw.Release,
-		key:    glfw.KeyF9,
+		key:    glfw.KeyF6,
 		callback: func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 			if self.Window.GetAttrib(glfw.Floating) == glfw.True {
 				self.Window.SetAttrib(glfw.Floating, glfw.False)

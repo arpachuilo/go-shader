@@ -14,21 +14,21 @@ uniform mat4 ProjectionMatrix;
 
 // mat
 struct Material {
-    vec3 ambient;
-    vec3 diffuse;
-    vec3 specular;
-    float shininess;
+  vec3 ambient;
+  vec3 diffuse;
+  vec3 specular;
+  float shininess;
 }; 
   
 uniform Material material;
 
 // lights
 struct Light {
-    vec3 position;
-  
-    vec3 ambient;
-    vec3 diffuse;
-    vec3 specular;
+  vec3 position;
+
+  vec3 ambient;
+  vec3 diffuse;
+  vec3 specular;
 };
 
 uniform Light light; 

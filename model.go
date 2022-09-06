@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
 )
@@ -17,6 +18,7 @@ type ModelBufferObject struct {
 
 func NewModelBufferObject(file string) *ModelBufferObject {
 	model := NewModel(file)
+
 	log.Printf(
 		"loaded %v with %v vertices and %v vertex indices\n",
 		file,
@@ -36,32 +38,36 @@ func NewModelBufferObject(file string) *ModelBufferObject {
 	uvSize := len(model.Uvs) * F32_SIZE
 	gl.BufferData(gl.ARRAY_BUFFER, vecSize+uvSize+normalSize, nil, gl.STATIC_DRAW)
 	gl.BufferSubData(gl.ARRAY_BUFFER, 0, vecSize, gl.Ptr(model.Vecs))
-	gl.BufferSubData(gl.ARRAY_BUFFER, vecSize, normalSize, gl.Ptr(model.Normals))
-	gl.BufferSubData(gl.ARRAY_BUFFER, vecSize+normalSize, uvSize, gl.Ptr(model.Uvs))
+
+	if normalSize != 0 {
+		gl.BufferSubData(gl.ARRAY_BUFFER, vecSize, normalSize, gl.Ptr(model.Normals))
+	}
+
+	if uvSize != 0 {
+		gl.BufferSubData(gl.ARRAY_BUFFER, vecSize+normalSize, uvSize, gl.Ptr(model.Uvs))
+	}
 
 	// Indices
 	gl.GenBuffers(1, &ibo)
 	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo)
 	vecISize := len(model.VecIndices) * F32_SIZE
-	// normalISize := len(model.NormalIndices) * F32_SIZE
-	// uvISize := len(model.UvIndices) * F32_SIZE
 	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, vecISize, gl.Ptr(model.VecIndices), gl.STATIC_DRAW)
-	// gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, vecISize+uvISize+normalISize, nil, gl.STATIC_DRAW)
-	// gl.BufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, vecISize, gl.Ptr(model.VecIndices))
-	// gl.BufferSubData(gl.ELEMENT_ARRAY_BUFFER, vecISize, normalISize, gl.Ptr(model.NormalIndices))
-	// gl.BufferSubData(gl.ELEMENT_ARRAY_BUFFER, vecISize+normalISize, uvISize, gl.Ptr(model.UvIndices))
 
 	// bind positions
 	gl.EnableVertexAttribArray(0)
-	gl.VertexAttribPointerWithOffset(0, 3, gl.FLOAT, false, 0, uintptr(0))
+	gl.VertexAttribPointerWithOffset(0, 3, gl.FLOAT, true, 0, uintptr(0))
 
 	// bind normals
-	gl.EnableVertexAttribArray(2)
-	gl.VertexAttribPointerWithOffset(2, 3, gl.FLOAT, false, 0, uintptr(vecSize))
+	if normalSize != 0 {
+		gl.EnableVertexAttribArray(2)
+		gl.VertexAttribPointerWithOffset(2, 3, gl.FLOAT, false, 0, uintptr(vecSize))
+	}
 
 	// bind uvs
-	gl.EnableVertexAttribArray(1)
-	gl.VertexAttribPointerWithOffset(1, 2, gl.FLOAT, false, 0, uintptr(vecSize+normalSize))
+	if vecSize != 0 {
+		gl.EnableVertexAttribArray(1)
+		gl.VertexAttribPointerWithOffset(1, 2, gl.FLOAT, false, 0, uintptr(vecSize+normalSize))
+	}
 
 	return &ModelBufferObject{
 		vao, vbo, ibo,
@@ -72,7 +78,7 @@ func NewModelBufferObject(file string) *ModelBufferObject {
 func (self ModelBufferObject) Draw() {
 	gl.BindVertexArray(self.vao)
 	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, self.ibo)
-	gl.DrawElements(gl.TRIANGLES, int32(len(self.VecIndices)), gl.UNSIGNED_BYTE, nil)
+	gl.DrawElements(gl.TRIANGLES, int32(len(self.VecIndices)*4), gl.UNSIGNED_INT, nil)
 }
 
 func (self ModelBufferObject) VAO() uint32 {
@@ -90,12 +96,14 @@ func (self ModelBufferObject) IBO() uint32 {
 // Model is a renderable collection of vecs.
 type Model struct {
 	// For the v, vt and vn in the obj file.
-	// Vecs, Normals []mgl32.Vec3
-	// Uvs           []mgl32.Vec2
-	Vecs, Normals, Uvs []float32
+	Vecs    []float32
+	Normals []float32
+	Uvs     []float32
 
-	// For the fun "f" in the obj file.
-	VecIndices, NormalIndices, UvIndices []uint8
+	// faces
+	VecIndices    []uint32
+	NormalIndices []uint32
+	UvIndices     []uint32
 }
 
 // NewModel will read an OBJ model file and create a Model from its contents
@@ -165,29 +173,37 @@ func NewModel(file string) *Model {
 
 		// INDICES.
 		case "f":
-			var vx, vy, vz int
-			var nx, ny, nz int
-			var ux, uy, uz int
+			var vx, vy, vz uint32
+			var nx, ny, nz uint32
+			var ux, uy, uz uint32
 
-			// todo: support wider range of formats
-			matches, _ := fmt.Fscanf(objI, "%d/%d/%d %d/%d/%d %d/%d/%d\n", &vx, &ux, &nx, &vy, &uy, &ny, &vz, &uz, &nz)
-			if matches != 9 {
-				panic("Cannot read your file")
+			line, err := objI.ReadString('\n')
+			if err != nil {
+				fmt.Println(err)
+				panic(err)
+			}
+
+			// quick way to handle empty tex
+			line = strings.ReplaceAll(line, "//", "/0/")
+
+			rl := strings.NewReader(line)
+			// count number of coordinate pairs
+			slashes := strings.Count(line, "/") / 2
+
+			switch slashes {
+			case 0: // only position
+				fmt.Fscanf(rl, "%d %d %d", &vx, &vy, &vz)
+			case 2: // two coords
+				fmt.Fscanf(rl, "%d/%d/%d %d/%d/%d", &vx, &ux, &nx, &vy, &uy, &ny)
+			case 3: // three coords
+				fmt.Fscanf(rl, "%d/%d/%d %d/%d/%d %d/%d/%d", &vx, &ux, &nx, &vy, &uy, &ny, &vz, &uz, &nz)
 			}
 
 			// add indices
 			// quick fix w/ minus 1. look into proper handling of this another time
-			model.VecIndices = append(model.VecIndices, uint8(vx)-1)
-			model.VecIndices = append(model.VecIndices, uint8(vy)-1)
-			model.VecIndices = append(model.VecIndices, uint8(vz)-1)
-
-			model.NormalIndices = append(model.NormalIndices, uint8(nx)-1)
-			model.NormalIndices = append(model.NormalIndices, uint8(ny)-1)
-			model.NormalIndices = append(model.NormalIndices, uint8(nz)-1)
-
-			model.UvIndices = append(model.UvIndices, uint8(ux)-1)
-			model.UvIndices = append(model.UvIndices, uint8(uy)-1)
-			model.UvIndices = append(model.UvIndices, uint8(uz)-1)
+			model.VecIndices = append(model.VecIndices, vx-1, vy-1, vz-1)
+			model.NormalIndices = append(model.NormalIndices, nx-1, ny-1, nz-1)
+			model.UvIndices = append(model.UvIndices, ux-1, uy-1, uz-1)
 		}
 	}
 

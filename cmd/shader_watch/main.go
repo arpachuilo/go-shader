@@ -86,10 +86,7 @@ func (self *LiveEditProgram) LoadR(r *Renderer) {
 	self.watcher = NewShaderWatcher()
 
 	// create scene shader+vao (all cubes)
-	// self.bo = NewVIBuffer(CubeVertices, CubeIndices, 4, 36)
-	// self.bo = NewVIBuffer(CubeAltVertices, CubeAltIndices, 36)
-	self.bo = NewModelBufferObject("./assets/teapot.obj")
-	// self.bo = NewModelBufferObject("./assets/donut01.obj")
+	self.bo = NewVIBuffer(CubeAltVertices, CubeAltIndices, 36)
 	shader := MustCompileShader(VertexShader, FragShader, self.bo)
 	self.shader = &shader
 	self.watcher.Add(self.shader, self.vertFilename, self.fragFilename, self.bo)
@@ -133,7 +130,7 @@ func (self *LiveEditProgram) LoadR(r *Renderer) {
 	// rand.Seed(time.Now().UnixNano())
 	rand.Seed(42)
 	var head *Transform
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 50; i++ {
 		n := NewTransform()
 		n.Object = self.bo
 		// scale := rand.Float32() * 20
@@ -195,7 +192,8 @@ func (self *LiveEditProgram) run(t float64) {
 	self.Scene.Root.Walk(func(mm mgl32.Mat4, n *Transform) {
 		cubeRotation := 360.0 * math.Sin(t/self.muls[i]) / 2.0
 		cubeAngle := float32(Deg2Rad(cubeRotation))
-		rm := mm.Mul4(
+		scale := mgl32.Scale3D(1, 1, 1)
+		rm := mm.Mul4(scale).Mul4(
 			mgl32.AnglesToQuat(
 				cubeAngle, cubeAngle, cubeAngle,
 				mgl32.RotationOrder(mgl32.YXZ),
