@@ -40,7 +40,7 @@ func (self *Recorder) Start() {
 	self.frames = make([]*image.RGBA, 0)
 	self.startTime = time.Now()
 
-	beeep.Notify("Video Recording Started", "Press Q to end recording", "")
+	beeep.Notify("Video Recording Started", "Press F3 to end recording", "")
 }
 
 func (self *Recorder) Capture() {
