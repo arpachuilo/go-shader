@@ -11,6 +11,10 @@ Learning OpenGL and GLFW using Go.
 ## Game of Life Shader
 
 Game of life shader.
+![game_of_life](https://user-images.githubusercontent.com/8808952/188760352-218303b0-d106-4bd3-93d9-f3b98edf29bc.png)
+![game_of_life_2](https://user-images.githubusercontent.com/8808952/188760364-b376103b-1fad-4c8b-a336-5be01db35883.png)
+![cyclic_life_2](https://user-images.githubusercontent.com/8808952/188760385-6ab3ad32-f0a1-404c-a02e-e6da5fa9dd66.png)
+![cyclic_life](https://user-images.githubusercontent.com/8808952/188760393-4155045d-1ee5-4135-809a-eda472a7d9a4.png)
 
 `make run PROGRAM=game_of_life`
 
